@@ -1,0 +1,410 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Facilities & staff
+// ---------------------------------------------------------------------------
+
+model Facility {
+  id               String   @id @default(uuid())
+  name             String
+  /// NHIA-assigned facility code, where applicable
+  nhisFacilityCode String?
+  state            String
+  lga              String // Local Government Area
+  address          String?
+  phone            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users                    User[]
+  patients                 Patient[]
+  encounters               Encounter[]
+  auditLogs                AuditLog[]
+  notifiableDiseaseReports NotifiableDiseaseReport[]
+
+  @@map("facilities")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  DOCTOR
+  NURSE
+  PHARMACIST
+  LAB_TECH
+  RECORDS_OFFICER
+  BILLING_OFFICER
+}
+
+model User {
+  id             String    @id @default(uuid())
+  facilityId     String
+  facility       Facility  @relation(fields: [facilityId], references: [id])
+  email          String    @unique
+  passwordHash   String
+  fullName       String
+  role           Role
+  /// Professional license number (MDCN/NMCN/PCN/etc.) for clinical roles
+  licenseNumber  String?
+  licenseBody    String?
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  encountersAsClinician Encounter[]        @relation("EncounterClinician")
+  vitalsRecorded        VitalSigns[]
+  diagnosesNoted        Diagnosis[]
+  prescriptionsWritten  Prescription[]
+  labOrdersPlaced       LabOrder[]
+  labResultsEntered     LabResult[]
+  consentsRecorded      ConsentRecord[]
+  patientsRegistered    Patient[]          @relation("PatientRegisteredBy")
+  auditLogs             AuditLog[]
+  dataSubjectRequests   DataSubjectRequest[] @relation("DSRHandledBy")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Patients
+// ---------------------------------------------------------------------------
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+model Patient {
+  id         String   @id @default(uuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+
+  /// Facility-issued Medical Record Number, human-readable, unique per facility
+  mrn String
+
+  /// AES-256-GCM encrypted National Identification Number (NIMC NIN)
+  ninEncrypted String?
+  nhisNumber   String?
+
+  surname     String
+  firstName   String
+  otherNames  String?
+  dateOfBirth DateTime
+  sex         Sex
+
+  /// AES-256-GCM encrypted phone number
+  phoneEncrypted String?
+  address        String?
+  state          String?
+  lga            String?
+
+  nextOfKinName    String?
+  nextOfKinPhone   String?
+  nextOfKinRelation String?
+
+  bloodGroup String?
+  genotype   String?
+
+  registeredById String?
+  registeredBy   User?   @relation("PatientRegisteredBy", fields: [registeredById], references: [id])
+
+  /// Set when a right-to-erasure request has been fulfilled via anonymisation
+  anonymisedAt DateTime?
+
+  /// Idempotency key set by the offline client at creation time, so a sync
+  /// retry never creates a duplicate patient.
+  clientGeneratedId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  encounters          Encounter[]
+  consentRecords       ConsentRecord[]
+  dataSubjectRequests  DataSubjectRequest[]
+  notifiableDiseaseReports NotifiableDiseaseReport[]
+
+  @@unique([facilityId, mrn])
+  @@index([facilityId, surname, firstName])
+  @@map("patients")
+}
+
+// ---------------------------------------------------------------------------
+// NDPR: consent & data subject rights
+// ---------------------------------------------------------------------------
+
+enum ConsentPurpose {
+  TREATMENT
+  RESEARCH
+  DATA_SHARING_NHIS
+  DATA_SHARING_HMO
+  MARKETING
+}
+
+enum ConsentMethod {
+  VERBAL
+  WRITTEN
+  ELECTRONIC
+}
+
+model ConsentRecord {
+  id         String         @id @default(uuid())
+  patientId  String
+  patient    Patient        @relation(fields: [patientId], references: [id])
+  purpose    ConsentPurpose
+  granted    Boolean
+  method     ConsentMethod
+  grantedAt  DateTime?
+  revokedAt  DateTime?
+  notes      String?
+
+  recordedById String
+  recordedBy   User   @relation(fields: [recordedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([patientId, purpose])
+  @@map("consent_records")
+}
+
+enum DataSubjectRequestType {
+  ACCESS
+  RECTIFICATION
+  ERASURE
+}
+
+enum DataSubjectRequestStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+model DataSubjectRequest {
+  id        String                   @id @default(uuid())
+  patientId String
+  patient   Patient                  @relation(fields: [patientId], references: [id])
+  type      DataSubjectRequestType
+  status    DataSubjectRequestStatus @default(PENDING)
+  requestedAt DateTime               @default(now())
+  resolvedAt  DateTime?
+  notes       String?
+
+  handledById String?
+  handledBy   User?   @relation("DSRHandledBy", fields: [handledById], references: [id])
+
+  @@map("data_subject_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Clinical: encounters, vitals, diagnoses, prescriptions, labs
+// ---------------------------------------------------------------------------
+
+enum EncounterType {
+  OUTPATIENT
+  INPATIENT
+  EMERGENCY
+  ANTENATAL
+}
+
+enum EncounterStatus {
+  OPEN
+  CLOSED
+}
+
+model Encounter {
+  id         String   @id @default(uuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  clinicianId String
+  clinician   User   @relation("EncounterClinician", fields: [clinicianId], references: [id])
+
+  type           EncounterType
+  status         EncounterStatus @default(OPEN)
+  visitDate      DateTime        @default(now())
+  chiefComplaint String?
+  notes          String?
+
+  clientGeneratedId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vitals        VitalSigns[]
+  diagnoses     Diagnosis[]
+  prescriptions Prescription[]
+  labOrders     LabOrder[]
+
+  @@index([facilityId, visitDate])
+  @@index([patientId, visitDate])
+  @@map("encounters")
+}
+
+model VitalSigns {
+  id          String    @id @default(uuid())
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  temperatureC     Float?
+  bloodPressureSys Int?
+  bloodPressureDia Int?
+  pulseBpm         Int?
+  respiratoryRate  Int?
+  spo2Percent      Int?
+  weightKg         Float?
+  heightCm         Float?
+
+  recordedById String
+  recordedBy   User   @relation(fields: [recordedById], references: [id])
+  recordedAt   DateTime @default(now())
+
+  @@map("vital_signs")
+}
+
+model NotifiableDisease {
+  id         String  @id @default(uuid())
+  icd10Code  String  @unique
+  name       String
+  /// Reporting timeframe required under NCDC IDSR, e.g. "IMMEDIATE" or "WEEKLY"
+  reportingTimeframe String
+
+  diagnoses Diagnosis[]
+
+  @@map("notifiable_diseases")
+}
+
+model Diagnosis {
+  id          String    @id @default(uuid())
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  icd10Code   String
+  description String
+
+  notifiableDiseaseId String?
+  notifiableDisease    NotifiableDisease? @relation(fields: [notifiableDiseaseId], references: [id])
+
+  notedById String
+  notedBy   User   @relation(fields: [notedById], references: [id])
+  notedAt   DateTime @default(now())
+
+  notifiableDiseaseReport NotifiableDiseaseReport?
+
+  @@map("diagnoses")
+}
+
+model NotifiableDiseaseReport {
+  id           String   @id @default(uuid())
+  diagnosisId  String   @unique
+  diagnosis    Diagnosis @relation(fields: [diagnosisId], references: [id])
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  facilityId   String
+  facility     Facility @relation(fields: [facilityId], references: [id])
+
+  reportedToNCDC Boolean   @default(false)
+  reportedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("notifiable_disease_reports")
+}
+
+model Prescription {
+  id          String    @id @default(uuid())
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  medicationName String
+  dosage         String
+  frequency      String
+  durationDays   Int
+  route          String
+
+  prescribedById String
+  prescribedBy   User   @relation(fields: [prescribedById], references: [id])
+
+  dispensed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("prescriptions")
+}
+
+enum LabOrderStatus {
+  ORDERED
+  COLLECTED
+  RESULTED
+  CANCELLED
+}
+
+model LabOrder {
+  id          String    @id @default(uuid())
+  encounterId String
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+
+  testName String
+  status   LabOrderStatus @default(ORDERED)
+
+  orderedById String
+  orderedBy   User   @relation(fields: [orderedById], references: [id])
+  orderedAt   DateTime @default(now())
+
+  result LabResult?
+
+  @@map("lab_orders")
+}
+
+model LabResult {
+  id         String   @id @default(uuid())
+  labOrderId String   @unique
+  labOrder   LabOrder @relation(fields: [labOrderId], references: [id])
+
+  resultValue    String
+  unit           String?
+  referenceRange String?
+  flagged        Boolean @default(false)
+
+  resultedById String
+  resultedBy   User   @relation(fields: [resultedById], references: [id])
+  resultedAt   DateTime @default(now())
+
+  @@map("lab_results")
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  facilityId String?
+  facility   Facility? @relation(fields: [facilityId], references: [id])
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  actorRole  Role?
+
+  action     String // e.g. "PATIENT_READ", "PATIENT_CREATE", "ENCOUNTER_UPDATE"
+  entityType String
+  entityId   String?
+  patientId  String?
+
+  ipAddress String?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([patientId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
