@@ -80,6 +80,53 @@ App runs on `http://localhost:5173`.
 - NCDC notifiable-disease flagging for reportable diagnoses
 - Offline-first sync: the frontend queues writes locally and syncs when back online
 
+## Deploying
+
+GitHub Pages only serves static files, so it can host the frontend but not
+the NestJS backend. The split used here: **backend on Render**, **database
+on Supabase**, **frontend on GitHub Pages**.
+
+### 1. Database (Supabase)
+
+If you haven't already, create a project at [supabase.com](https://supabase.com)
+and run the backend's migrations/seed against its **direct connection**
+string (port 5432) as described above. Render will reuse this same database.
+
+### 2. Backend (Render)
+
+1. Push this repo to GitHub (already done if you're reading this on GitHub).
+2. At [dashboard.render.com](https://dashboard.render.com), click **New +** →
+   **Blueprint**, and point it at this repo. Render reads [`render.yaml`](./render.yaml)
+   and proposes a `vitalis-api` web service.
+3. Fill in the secrets it leaves blank (`sync: false` in `render.yaml`):
+   - `DATABASE_URL` — the same Supabase direct-connection string you used locally.
+   - `JWT_SECRET` — generate a fresh one for production:
+     `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+   - `FIELD_ENCRYPTION_KEY` — **must exactly match** the value you used
+     locally when you ran `npm run seed` (it decrypts NIN/phone fields
+     already encrypted with that key — a different key can't read them back).
+   - `CORS_ORIGINS` — your GitHub Pages origin, e.g. `https://<owner>.github.io`.
+4. Deploy. Render builds and runs `prisma migrate deploy` automatically on
+   each deploy. Note the service URL, e.g. `https://vitalis-api.onrender.com`.
+
+The free Render plan sleeps after inactivity — the first request after idle
+takes ~30s to wake it back up.
+
+### 3. Frontend (GitHub Pages)
+
+1. In the repo: **Settings → Pages → Source → GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → Variables** → add
+   `VITE_API_BASE_URL` = `https://vitalis-api.onrender.com/api` (your Render
+   URL from step 2, with `/api`).
+3. Push to `main` (or run the **Deploy frontend to GitHub Pages** workflow
+   manually from the Actions tab). [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)
+   builds the Vite app and publishes it.
+4. The app will be live at `https://<owner>.github.io/Vitalis/`.
+
+The frontend uses hash-based routing (`/#/patients`) on this deployment so
+direct links and refreshes work without server-side rewrite rules, which
+GitHub Pages doesn't support.
+
 ## Roadmap (not yet built)
 
 - Billing / NHIS & private HMO claims submission

@@ -2,7 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// GitHub Pages serves this app from https://<owner>.github.io/Vitalis/, a
+// subpath — not the domain root — so every asset/route reference needs this
+// base. Override with VITE_BASE_PATH for other hosts (e.g. Vercel, where the
+// app lives at the root and base should be '/').
+const base = process.env.VITE_BASE_PATH ?? '/Vitalis/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -15,7 +22,8 @@ export default defineConfig({
         theme_color: '#0f766e',
         background_color: '#ffffff',
         display: 'standalone',
-        start_url: '/',
+        start_url: base,
+        scope: base,
         icons: [],
       },
       workbox: {
