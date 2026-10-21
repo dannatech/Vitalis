@@ -7,7 +7,7 @@ interface LogoProps {
 export default function Logo({ size = 28, withWordmark = false }: LogoProps) {
   const mark = (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="#0f766e" />
+      <rect width="32" height="32" rx="8" fill="#111111" />
       <path
         d="M4 16H10L13 8L17 24L20 12L23 16H28"
         stroke="white"

@@ -19,7 +19,7 @@ export default defineConfig({
         name: 'Vitalis EHR',
         short_name: 'Vitalis',
         description: 'Offline-first EHR for Nigerian hospitals',
-        theme_color: '#0f766e',
+        theme_color: '#111111',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: base,
