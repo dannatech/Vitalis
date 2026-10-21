@@ -8,6 +8,11 @@ export default function Layout() {
   const { user, isDemo, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  // Mirrors the backend's GET /ncdc-reports RBAC — pharmacy/lab/billing
+  // roles have no clinical or compliance reason to see this worklist.
+  const canSeeNcdcReports =
+    user &&
+    ['DOCTOR', 'NURSE', 'RECORDS_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
   function closeSidebar() {
     setSidebarOpen(false);
@@ -38,6 +43,11 @@ export default function Layout() {
             <NavLink to="/labs" onClick={closeSidebar}>
               Labs
             </NavLink>
+            {canSeeNcdcReports && (
+              <NavLink to="/ncdc-reports" onClick={closeSidebar}>
+                NCDC Reports
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink to="/staff" onClick={closeSidebar}>
                 Staff

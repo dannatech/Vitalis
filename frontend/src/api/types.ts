@@ -146,3 +146,22 @@ export interface LabWorklistEntry {
     resultedAt: string;
   } | null;
 }
+
+/** One row of the NCDC notifiable-disease report worklist — GET /ncdc-reports. */
+export interface NcdcReportEntry {
+  id: string;
+  patient: {
+    id: string;
+    mrn: string;
+    surname: string;
+    firstName: string;
+  };
+  icd10Code: string;
+  diagnosisDescription: string;
+  diseaseName: string;
+  reportingTimeframe: string | null;
+  notedAt: string;
+  reportedToNCDC: boolean;
+  reportedAt: string | null;
+  createdAt: string;
+}
