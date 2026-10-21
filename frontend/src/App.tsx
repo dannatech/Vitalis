@@ -14,6 +14,7 @@ import EncounterDetailPage from './pages/EncounterDetailPage';
 import LabsPage from './pages/LabsPage';
 import StaffPage from './pages/StaffPage';
 import NcdcReportsPage from './pages/NcdcReportsPage';
+import PharmacyPage from './pages/PharmacyPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/labs" element={<LabsPage />} />
             <Route path="/staff" element={<StaffPage />} />
             <Route path="/ncdc-reports" element={<NcdcReportsPage />} />
+            <Route path="/pharmacy" element={<PharmacyPage />} />
           </Route>
         </Route>
       </Routes>

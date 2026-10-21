@@ -62,7 +62,8 @@ model User {
   encountersAsClinician Encounter[]        @relation("EncounterClinician")
   vitalsRecorded        VitalSigns[]
   diagnosesNoted        Diagnosis[]
-  prescriptionsWritten  Prescription[]
+  prescriptionsWritten  Prescription[]    @relation("PrescriptionPrescriber")
+  prescriptionsDispensed Prescription[]   @relation("PrescriptionDispenser")
   labOrdersPlaced       LabOrder[]
   labResultsEntered     LabResult[]
   consentsRecorded      ConsentRecord[]
@@ -333,9 +334,13 @@ model Prescription {
   route          String
 
   prescribedById String
-  prescribedBy   User   @relation(fields: [prescribedById], references: [id])
+  prescribedBy   User   @relation("PrescriptionPrescriber", fields: [prescribedById], references: [id])
 
-  dispensed   Boolean  @default(false)
+  dispensed     Boolean   @default(false)
+  dispensedAt   DateTime?
+  dispensedById String?
+  dispensedBy   User?     @relation("PrescriptionDispenser", fields: [dispensedById], references: [id])
+
   createdAt   DateTime @default(now())
 
   @@map("prescriptions")

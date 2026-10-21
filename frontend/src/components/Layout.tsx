@@ -13,6 +13,9 @@ export default function Layout() {
   const canSeeNcdcReports =
     user &&
     ['DOCTOR', 'NURSE', 'RECORDS_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  // Mirrors the backend's GET /pharmacy/prescriptions RBAC.
+  const canSeePharmacy =
+    user && ['PHARMACIST', 'DOCTOR', 'NURSE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
   function closeSidebar() {
     setSidebarOpen(false);
@@ -46,6 +49,11 @@ export default function Layout() {
             {canSeeNcdcReports && (
               <NavLink to="/ncdc-reports" onClick={closeSidebar}>
                 NCDC Reports
+              </NavLink>
+            )}
+            {canSeePharmacy && (
+              <NavLink to="/pharmacy" onClick={closeSidebar}>
+                Pharmacy
               </NavLink>
             )}
             {isAdmin && (

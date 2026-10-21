@@ -165,3 +165,23 @@ export interface NcdcReportEntry {
   reportedAt: string | null;
   createdAt: string;
 }
+
+/** One row of the facility-wide dispensing worklist — GET /pharmacy/prescriptions. */
+export interface PrescriptionWorklistEntry {
+  id: string;
+  encounterId: string;
+  patient: {
+    id: string;
+    mrn: string;
+    surname: string;
+    firstName: string;
+  };
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  durationDays: number;
+  route: string;
+  dispensed: boolean;
+  dispensedAt: string | null;
+  createdAt: string;
+}
