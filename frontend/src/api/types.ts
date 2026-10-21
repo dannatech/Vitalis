@@ -16,6 +16,17 @@ export interface AuthUser {
   facilityId: string;
 }
 
+export interface StaffMember {
+  id: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  licenseNumber: string | null;
+  licenseBody: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Patient {
   id: string;
   facilityId: string;

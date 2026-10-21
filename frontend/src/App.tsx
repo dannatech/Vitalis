@@ -12,6 +12,7 @@ import PatientDetailPage from './pages/PatientDetailPage';
 import EncounterFormPage from './pages/EncounterFormPage';
 import EncounterDetailPage from './pages/EncounterDetailPage';
 import LabsPage from './pages/LabsPage';
+import StaffPage from './pages/StaffPage';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/patients/:patientId/encounters/new" element={<EncounterFormPage />} />
             <Route path="/encounters/:id" element={<EncounterDetailPage />} />
             <Route path="/labs" element={<LabsPage />} />
+            <Route path="/staff" element={<StaffPage />} />
           </Route>
         </Route>
       </Routes>

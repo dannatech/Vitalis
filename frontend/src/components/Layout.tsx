@@ -7,6 +7,7 @@ import Logo from './Logo';
 export default function Layout() {
   const { user, isDemo, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   function closeSidebar() {
     setSidebarOpen(false);
@@ -37,6 +38,11 @@ export default function Layout() {
             <NavLink to="/labs" onClick={closeSidebar}>
               Labs
             </NavLink>
+            {isAdmin && (
+              <NavLink to="/staff" onClick={closeSidebar}>
+                Staff
+              </NavLink>
+            )}
           </nav>
         </aside>
 
