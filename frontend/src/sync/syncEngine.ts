@@ -1,6 +1,7 @@
 import apiClient, { AUTH_STORAGE_KEY } from '../api/client';
 import { db, localId } from '../db/offlineDb';
 import type { Encounter, Patient } from '../api/types';
+import { DEMO_MODE_STORAGE_KEY } from '../demo/seedDemoData';
 
 const LAST_SYNCED_KEY = 'lastSyncedAt';
 const SYNC_INTERVAL_MS = 30_000;
@@ -20,6 +21,10 @@ function notify() {
 
 function isAuthenticated(): boolean {
   return Boolean(localStorage.getItem(AUTH_STORAGE_KEY));
+}
+
+function isDemoMode(): boolean {
+  return localStorage.getItem(DEMO_MODE_STORAGE_KEY) === 'true';
 }
 
 async function flushPatients() {
@@ -97,7 +102,7 @@ async function pull() {
 }
 
 export async function runSync(): Promise<void> {
-  if (syncing || !navigator.onLine || !isAuthenticated()) return;
+  if (syncing || !navigator.onLine || !isAuthenticated() || isDemoMode()) return;
   syncing = true;
   notify();
   try {

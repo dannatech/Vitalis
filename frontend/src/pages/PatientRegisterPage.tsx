@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { db, localId, newClientId } from '../db/offlineDb';
 import type { Patient } from '../api/types';
 import { runSync } from '../sync/syncEngine';
+import { useAuth } from '../auth/AuthContext';
 import BackButton from '../components/BackButton';
 
 const emptyForm = {
@@ -27,6 +28,7 @@ const emptyForm = {
 
 export default function PatientRegisterPage() {
   const navigate = useNavigate();
+  const { isDemo } = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,25 +40,8 @@ export default function PatientRegisterPage() {
     e.preventDefault();
     setSubmitting(true);
 
-    const clientGeneratedId = newClientId();
-    const payload: Record<string, unknown> = { ...form, clientGeneratedId };
-    // Drop empty optional strings so they don't overwrite with blanks server-side.
-    for (const key of Object.keys(payload)) {
-      if (payload[key] === '') delete payload[key];
-    }
-
-    await db.outboxPatients.put({
-      clientGeneratedId,
-      payload,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
-
-    // Optimistic local cache entry so the patient is visible immediately,
-    // even with no connectivity. Replaced by the canonical server record
-    // once the sync engine confirms the write — see syncEngine.ts.
-    const optimisticPatient: Patient = {
-      id: localId(clientGeneratedId),
+    const now = new Date().toISOString();
+    const basePatient = {
       facilityId: '',
       mrn: form.mrn,
       nin: form.nin || null,
@@ -76,8 +61,41 @@ export default function PatientRegisterPage() {
       bloodGroup: form.bloodGroup || null,
       genotype: form.genotype || null,
       anonymisedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (isDemo) {
+      // Preview mode has no real backend session — queuing this for sync
+      // would just fail forever (see syncEngine.ts). Write it straight to
+      // the local cache as a finished record instead; there's nothing to
+      // sync it to, so it shouldn't show as "pending".
+      const demoPatient: Patient = { ...basePatient, id: crypto.randomUUID() };
+      await db.patients.put(demoPatient);
+      navigate(`/patients/${demoPatient.id}`);
+      return;
+    }
+
+    const clientGeneratedId = newClientId();
+    const payload: Record<string, unknown> = { ...form, clientGeneratedId };
+    // Drop empty optional strings so they don't overwrite with blanks server-side.
+    for (const key of Object.keys(payload)) {
+      if (payload[key] === '') delete payload[key];
+    }
+
+    await db.outboxPatients.put({
+      clientGeneratedId,
+      payload,
+      status: 'pending',
+      createdAt: now,
+    });
+
+    // Optimistic local cache entry so the patient is visible immediately,
+    // even with no connectivity. Replaced by the canonical server record
+    // once the sync engine confirms the write — see syncEngine.ts.
+    const optimisticPatient: Patient = {
+      ...basePatient,
+      id: localId(clientGeneratedId),
       clientGeneratedId,
     };
     await db.patients.put(optimisticPatient);
@@ -91,8 +109,9 @@ export default function PatientRegisterPage() {
       <BackButton fallback="/patients" />
       <h1>Register patient</h1>
       <p className="subtitle">
-        Works offline — this record queues locally and syncs automatically once you're back
-        online.
+        {isDemo
+          ? 'Preview mode — this sample patient is saved locally in your browser only.'
+          : "Works offline — this record queues locally and syncs automatically once you're back online."}
       </p>
       <form className="form-grid" onSubmit={handleSubmit}>
         <label>

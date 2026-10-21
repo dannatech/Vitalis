@@ -10,7 +10,12 @@ import {
 import apiClient, { AUTH_STORAGE_KEY } from '../api/client';
 import type { AuthUser } from '../api/types';
 import { startSyncEngine, stopSyncEngine } from '../sync/syncEngine';
-import { DEMO_FACILITY_ID, clearDemoData, seedDemoData } from '../demo/seedDemoData';
+import {
+  DEMO_FACILITY_ID,
+  DEMO_MODE_STORAGE_KEY,
+  clearDemoData,
+  seedDemoData,
+} from '../demo/seedDemoData';
 
 interface StoredAuth {
   accessToken: string;
@@ -28,7 +33,7 @@ export interface RegisterPayload {
   password: string;
 }
 
-const DEMO_FLAG_KEY = 'vitalis.demoMode';
+const DEMO_FLAG_KEY = DEMO_MODE_STORAGE_KEY;
 
 interface AuthContextValue {
   user: AuthUser | null;

@@ -4,11 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { clientIdFromLocalId, db } from '../db/offlineDb';
 import apiClient from '../api/client';
 import type { EncounterDetail } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
 import BackButton from '../components/BackButton';
 
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isDemo } = useAuth();
   const directEncounter = useLiveQuery(() => (id ? db.encounters.get(id) : undefined), [id]);
 
   // Same rationale as PatientDetailPage: an offline-created encounter's temp
@@ -36,7 +38,9 @@ export default function EncounterDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
-    if (!id_ || isUnsynced) return;
+    // Demo-mode encounters only ever exist in the local cache, never on a
+    // real backend — fetching clinical detail for one would just 404/fail.
+    if (!id_ || isUnsynced || isDemo) return;
     try {
       const { data } = await apiClient.get<EncounterDetail>(`/encounters/${id_}`);
       setDetail(data);
@@ -44,7 +48,7 @@ export default function EncounterDetailPage() {
     } catch {
       setError('Could not load clinical detail — check connectivity.');
     }
-  }, [id_, isUnsynced]);
+  }, [id_, isUnsynced, isDemo]);
 
   useEffect(() => {
     void loadDetail();
@@ -67,9 +71,16 @@ export default function EncounterDetailPage() {
         </div>
       )}
 
-      {!isUnsynced && error && <div className="error-banner">{error}</div>}
+      {!isUnsynced && isDemo && (
+        <div className="hint">
+          Preview mode — vitals, diagnoses, prescriptions and lab orders need a real backend, so
+          they're not available for this sample encounter.
+        </div>
+      )}
 
-      {!isUnsynced && detail && (
+      {!isUnsynced && !isDemo && error && <div className="error-banner">{error}</div>}
+
+      {!isUnsynced && !isDemo && detail && (
         <>
           <VitalsSection encounterId={id_!} vitals={detail.vitals} onSaved={loadDetail} />
           <DiagnosesSection encounterId={id_!} diagnoses={detail.diagnoses} onSaved={loadDetail} />
