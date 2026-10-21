@@ -32,7 +32,7 @@ const FEATURES = [
 export default function LandingPage() {
   const { user, loginDemo } = useAuth();
   const navigate = useNavigate();
-  const primaryCtaTarget = user ? '/dashboard' : '/login';
+  const primaryCtaTarget = user ? '/dashboard' : '/signup';
   const primaryCtaLabel = user ? 'Go to dashboard' : 'Get Started';
 
   async function handlePreview() {

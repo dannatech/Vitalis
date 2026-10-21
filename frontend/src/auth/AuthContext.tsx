@@ -17,6 +17,17 @@ interface StoredAuth {
   user: AuthUser;
 }
 
+export interface RegisterPayload {
+  facilityName: string;
+  state: string;
+  lga: string;
+  address?: string;
+  facilityPhone?: string;
+  adminFullName: string;
+  email: string;
+  password: string;
+}
+
 const DEMO_FLAG_KEY = 'vitalis.demoMode';
 
 interface AuthContextValue {
@@ -24,6 +35,8 @@ interface AuthContextValue {
   /** True when "Preview without login" was used instead of a real account. */
   isDemo: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Registers a new facility + its first admin account, then signs in as them. */
+  register: (payload: RegisterPayload) => Promise<void>;
   /**
    * Loads sample data into the local cache and signs in as a fake user,
    * entirely client-side — no real backend/API call, no real patient data.
@@ -63,6 +76,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     startSyncEngine();
   }, []);
 
+  const register = useCallback(async (payload: RegisterPayload) => {
+    const { data } = await apiClient.post<StoredAuth>('/auth/register', payload);
+    await clearDemoData();
+    localStorage.removeItem(DEMO_FLAG_KEY);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
+    setUser(data.user);
+    setIsDemo(false);
+    startSyncEngine();
+  }, []);
+
   const loginDemo = useCallback(async () => {
     const demoUser: AuthUser = {
       id: 'demo-user',
@@ -92,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isDemo, login, loginDemo, logout }),
-    [user, isDemo, login, loginDemo, logout],
+    () => ({ user, isDemo, login, register, loginDemo, logout }),
+    [user, isDemo, login, register, loginDemo, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

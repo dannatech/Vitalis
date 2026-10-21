@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import Logo from '../components/Logo';
 
@@ -58,6 +58,10 @@ export default function LoginPage() {
         <button type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <p className="subtitle" style={{ textAlign: 'center', margin: 0 }}>
+          New facility? <Link to="/signup">Register your hospital</Link>
+        </p>
 
         <div className="divider">or</div>
 

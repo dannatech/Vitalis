@@ -5,6 +5,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { CryptoModule } from './common/crypto/crypto.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { PatientsModule } from './patients/patients.module';
 import { EncountersModule } from './encounters/encounters.module';
 import { ConsentModule } from './consent/consent.module';
@@ -19,6 +20,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     PrismaModule,
     CryptoModule,
     AuthModule,
+    UsersModule,
     PatientsModule,
     EncountersModule,
     ConsentModule,
