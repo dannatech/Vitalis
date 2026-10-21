@@ -17,7 +17,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/');
+      navigate('/dashboard');
     } catch {
       setError('Invalid email or password.');
     } finally {
@@ -27,7 +27,7 @@ export default function LoginPage() {
 
   async function handlePreview() {
     await loginDemo();
-    navigate('/');
+    navigate('/dashboard');
   }
 
   return (

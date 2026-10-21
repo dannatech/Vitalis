@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import NetworkStatusBadge from './NetworkStatusBadge';
 import Logo from './Logo';
@@ -14,11 +14,11 @@ export default function Layout() {
         </div>
       )}
       <header className="app-header">
-        <Logo withWordmark size={26} />
+        <Link to="/dashboard">
+          <Logo withWordmark size={26} />
+        </Link>
         <nav>
-          <NavLink to="/" end>
-            Dashboard
-          </NavLink>
+          <NavLink to="/dashboard">Dashboard</NavLink>
           <NavLink to="/patients">Patients</NavLink>
         </nav>
         <div className="header-right">
