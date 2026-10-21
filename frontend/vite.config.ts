@@ -24,13 +24,15 @@ export default defineConfig({
         display: 'standalone',
         start_url: base,
         scope: base,
-        icons: [],
+        icons: [
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        ],
       },
       workbox: {
         // App shell only — clinical data is cached in IndexedDB (Dexie) by
         // the sync engine, not by the service worker.
         globPatterns: ['**/*.{js,css,html,svg}'],
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

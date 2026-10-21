@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { clientIdFromLocalId, db } from '../db/offlineDb';
 import { runSync } from '../sync/syncEngine';
+import BackButton from '../components/BackButton';
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +52,7 @@ export default function PatientDetailPage() {
 
   return (
     <div>
+      <BackButton fallback="/patients" />
       <div className="page-header">
         <div>
           <h1>

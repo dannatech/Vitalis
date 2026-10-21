@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { db, localId, newClientId } from '../db/offlineDb';
 import type { Patient } from '../api/types';
 import { runSync } from '../sync/syncEngine';
+import BackButton from '../components/BackButton';
 
 const emptyForm = {
   mrn: '',
@@ -87,6 +88,7 @@ export default function PatientRegisterPage() {
 
   return (
     <div>
+      <BackButton fallback="/patients" />
       <h1>Register patient</h1>
       <p className="subtitle">
         Works offline — this record queues locally and syncs automatically once you're back

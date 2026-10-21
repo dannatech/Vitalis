@@ -1,14 +1,20 @@
 :root {
   --primary: #0f766e;
   --primary-dark: #115e59;
+  --primary-soft: #ecfdf7;
+  --accent: #2dd4bf;
   --danger: #b91c1c;
   --warning: #b45309;
-  --bg: #f8fafc;
+  --bg: #f4f7f9;
   --card-bg: #ffffff;
-  --border: #e2e8f0;
+  --border: #e5e9ee;
   --text: #0f172a;
   --text-muted: #64748b;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --radius: 12px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
   color-scheme: light;
 }
 
@@ -19,16 +25,21 @@
 body {
   margin: 0;
   background: var(--bg);
+  background-image: radial-gradient(circle at top left, rgba(15, 118, 110, 0.05), transparent 40%);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 h1 {
   font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0 0 0.25rem;
 }
 
 h2 {
   font-size: 1.1rem;
+  font-weight: 600;
   margin: 0 0 0.75rem;
 }
 
@@ -48,11 +59,17 @@ h2 {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 1.5rem;
   margin-bottom: 1.25rem;
   max-width: 420px;
   width: 100%;
+}
+
+.login-card {
+  text-align: left;
+  box-shadow: var(--shadow-md);
 }
 
 form.card {
@@ -71,30 +88,47 @@ label {
 
 input,
 select {
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.95rem;
   color: var(--text);
+  background: var(--card-bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 button {
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
   font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 button:hover {
   background: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+button:active {
+  transform: translateY(1px);
 }
 
 button:disabled {
   opacity: 0.6;
   cursor: default;
+  transform: none;
 }
 
 button.secondary {
@@ -103,20 +137,68 @@ button.secondary {
   border: 1px solid var(--primary);
 }
 
+button.secondary:hover {
+  background: var(--primary-soft);
+}
+
 .button {
   display: inline-block;
   background: var(--primary);
   color: white;
   text-decoration: none;
-  border-radius: 6px;
-  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
   font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.button:hover {
+  background: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 .button.secondary {
   background: white;
   color: var(--primary);
   border: 1px solid var(--primary);
+}
+
+.button.secondary:hover {
+  background: var(--primary-soft);
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 0.3rem 0.4rem 0.3rem 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  box-shadow: none;
+}
+
+.back-button:hover {
+  color: var(--primary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo-wordmark {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .error-banner {
@@ -171,21 +253,19 @@ button.secondary {
 .app-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.75rem;
   padding: 0.75rem 1.5rem;
-  background: var(--card-bg);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(8px);
   border-bottom: 1px solid var(--border);
-}
-
-.app-header .brand {
-  font-weight: 700;
-  color: var(--primary);
-  font-size: 1.1rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .app-header nav {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   flex: 1;
 }
 
@@ -193,11 +273,19 @@ button.secondary {
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.3rem 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-header nav a:hover {
+  color: var(--text);
 }
 
 .app-header nav a.active {
   color: var(--primary);
-  font-weight: 600;
+  border-bottom-color: var(--primary);
 }
 
 .header-right {
@@ -262,7 +350,8 @@ button.secondary {
 .stat-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 1rem 1.5rem;
 }
 
@@ -300,16 +389,39 @@ button.secondary {
   border-collapse: collapse;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
-.data-table th,
-.data-table td {
+.data-table th {
   text-align: left;
   padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: #fafbfc;
+}
+
+.data-table td {
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+}
+
+.data-table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.data-table tbody tr:hover {
+  background: var(--primary-soft);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .data-table a {
@@ -329,7 +441,8 @@ button.secondary {
   gap: 1rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 1.5rem;
   max-width: 720px;
 }

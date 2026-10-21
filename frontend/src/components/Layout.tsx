@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import NetworkStatusBadge from './NetworkStatusBadge';
+import Logo from './Logo';
 
 export default function Layout() {
   const { user, isDemo, logout } = useAuth();
@@ -13,7 +14,7 @@ export default function Layout() {
         </div>
       )}
       <header className="app-header">
-        <div className="brand">Vitalis</div>
+        <Logo withWordmark size={26} />
         <nav>
           <NavLink to="/" end>
             Dashboard

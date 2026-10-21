@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { clientIdFromLocalId, db } from '../db/offlineDb';
 import apiClient from '../api/client';
 import type { EncounterDetail } from '../api/types';
+import BackButton from '../components/BackButton';
 
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +54,7 @@ export default function EncounterDetailPage() {
 
   return (
     <div>
+      <BackButton fallback={encounter.patientId ? `/patients/${encounter.patientId}` : '/patients'} />
       <h1>Encounter — {new Date(encounter.visitDate).toLocaleString()}</h1>
       <p className="subtitle">
         {encounter.type} · {encounter.status}

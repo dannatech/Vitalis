@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { db, localId, newClientId } from '../db/offlineDb';
 import type { Encounter, EncounterType } from '../api/types';
 import { runSync } from '../sync/syncEngine';
+import BackButton from '../components/BackButton';
 
 export default function EncounterFormPage() {
   const { patientId } = useParams<{ patientId: string }>();
@@ -46,6 +47,7 @@ export default function EncounterFormPage() {
 
   return (
     <div>
+      <BackButton fallback={patientId ? `/patients/${patientId}` : '/patients'} />
       <h1>New encounter</h1>
       <p className="subtitle">
         Works offline — this encounter queues locally and syncs automatically once you're back

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const { login, loginDemo } = useAuth();
@@ -31,7 +32,8 @@ export default function LoginPage() {
 
   return (
     <div className="centered-page">
-      <form className="card" onSubmit={handleSubmit}>
+      <form className="card login-card" onSubmit={handleSubmit}>
+        <Logo size={44} />
         <h1>Vitalis EHR</h1>
         <p className="subtitle">Sign in to your facility account</p>
         {error && <div className="error-banner">{error}</div>}
