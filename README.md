@@ -75,10 +75,27 @@ App runs on `http://localhost:5173`.
 - Staff accounts with role-based access control (RBAC)
 - Patient registration (MRN, NIN, NHIS number, demographics, next of kin)
 - Encounters/visits, vital signs, diagnoses (ICD-10), prescriptions, lab orders & results
+- Facility-wide lab worklist (`/labs`): every lab order/result across patients in one view
 - NDPR consent capture and data-subject access/erasure requests
 - Append-only audit logging of all access to patient data
 - NCDC notifiable-disease flagging for reportable diagnoses
 - Offline-first sync: the frontend queues writes locally and syncs when back online
+
+## Tests
+
+```bash
+cd backend && npm test    # Jest — unit tests with Prisma mocked out
+cd frontend && npm test   # Vitest
+```
+
+Backend specs cover the compliance-sensitive logic directly: role-based NIN
+redaction, NDPR erasure/anonymisation, NCDC notifiable-disease auto-flagging,
+and the sign-up/staff-creation RBAC rules (no open self-registration for
+clinical roles). Frontend specs cover the offline-sync id scheme and the
+demo-mode/real-session distinction the sync engine depends on. This is
+deliberately not full coverage — it targets the logic most likely to
+regress silently and least likely to be caught by manually clicking
+through the UI.
 
 ## Deploying
 

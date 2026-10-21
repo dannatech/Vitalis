@@ -1,5 +1,8 @@
 import { db } from '../db/offlineDb';
 import type { Encounter, Patient } from '../api/types';
+import { DEMO_FACILITY_ID } from './demoModeFlag';
+
+export { DEMO_FACILITY_ID, DEMO_MODE_STORAGE_KEY } from './demoModeFlag';
 
 /**
  * Sample data for "preview without login" (see LoginPage). This never
@@ -7,16 +10,6 @@ import type { Encounter, Patient } from '../api/types';
  * IndexedDB cache so the UI has something to show. Clearly fake patients,
  * fixed ids, easy to tell apart from anything synced from a real backend.
  */
-export const DEMO_FACILITY_ID = 'demo-facility';
-
-/**
- * localStorage flag set while "Preview without login" is active. Shared
- * between AuthContext (which sets/clears it) and the sync engine (which
- * must never attempt a real network sync in this mode — there is no real
- * session for it to authenticate with, so every attempt would just fail
- * and leave the write stuck in the outbox forever).
- */
-export const DEMO_MODE_STORAGE_KEY = 'vitalis.demoMode';
 const DEMO_PATIENT_IDS = ['demo-patient-1', 'demo-patient-2'];
 const DEMO_ENCOUNTER_IDS = ['demo-encounter-1'];
 

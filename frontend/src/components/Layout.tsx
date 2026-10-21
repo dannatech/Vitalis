@@ -34,6 +34,9 @@ export default function Layout() {
             <NavLink to="/patients" onClick={closeSidebar}>
               Patients
             </NavLink>
+            <NavLink to="/labs" onClick={closeSidebar}>
+              Labs
+            </NavLink>
           </nav>
         </aside>
 

@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite';
+// vitest/config re-exports Vite's defineConfig with an added `test` field —
+// same config file drives both `vite build` and `vitest`.
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -44,5 +46,9 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
   },
 });

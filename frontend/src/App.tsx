@@ -11,6 +11,7 @@ import PatientRegisterPage from './pages/PatientRegisterPage';
 import PatientDetailPage from './pages/PatientDetailPage';
 import EncounterFormPage from './pages/EncounterFormPage';
 import EncounterDetailPage from './pages/EncounterDetailPage';
+import LabsPage from './pages/LabsPage';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/patients/:id" element={<PatientDetailPage />} />
             <Route path="/patients/:patientId/encounters/new" element={<EncounterFormPage />} />
             <Route path="/encounters/:id" element={<EncounterDetailPage />} />
+            <Route path="/labs" element={<LabsPage />} />
           </Route>
         </Route>
       </Routes>

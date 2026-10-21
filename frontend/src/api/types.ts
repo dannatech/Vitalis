@@ -111,3 +111,27 @@ export interface EncounterDetail extends Encounter {
   prescriptions: Prescription[];
   labOrders: LabOrder[];
 }
+
+export type LabOrderStatus = 'ORDERED' | 'COLLECTED' | 'RESULTED' | 'CANCELLED';
+
+/** One row of the facility-wide lab worklist — GET /labs. */
+export interface LabWorklistEntry {
+  id: string;
+  testName: string;
+  status: LabOrderStatus;
+  orderedAt: string;
+  encounterId: string;
+  patient: {
+    id: string;
+    mrn: string;
+    surname: string;
+    firstName: string;
+  };
+  result: {
+    resultValue: string;
+    unit: string | null;
+    referenceRange: string | null;
+    flagged: boolean;
+    resultedAt: string;
+  } | null;
+}
