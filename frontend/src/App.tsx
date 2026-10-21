@@ -15,6 +15,7 @@ import LabsPage from './pages/LabsPage';
 import StaffPage from './pages/StaffPage';
 import NcdcReportsPage from './pages/NcdcReportsPage';
 import PharmacyPage from './pages/PharmacyPage';
+import BillingPage from './pages/BillingPage';
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/staff" element={<StaffPage />} />
             <Route path="/ncdc-reports" element={<NcdcReportsPage />} />
             <Route path="/pharmacy" element={<PharmacyPage />} />
+            <Route path="/billing" element={<BillingPage />} />
           </Route>
         </Route>
       </Routes>

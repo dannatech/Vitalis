@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PayersService } from '../billing/payers.service';
 import { JwtPayload } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
 
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly payersService: PayersService,
   ) {}
 
   async login(email: string, password: string) {
@@ -85,6 +87,8 @@ export class AuthService {
         },
       });
     });
+
+    await this.payersService.ensureSelfPayPayer(user.facilityId);
 
     const payload: JwtPayload = {
       sub: user.id,

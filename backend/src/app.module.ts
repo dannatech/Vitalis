@@ -12,6 +12,7 @@ import { LabsModule } from './labs/labs.module';
 import { NcdcReportsModule } from './ncdc-reports/ncdc-reports.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { ConsentModule } from './consent/consent.module';
+import { BillingModule } from './billing/billing.module';
 import { SyncModule } from './sync/sync.module';
 import { HealthController } from './health/health.controller';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -30,6 +31,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     NcdcReportsModule,
     PharmacyModule,
     ConsentModule,
+    BillingModule,
     SyncModule,
   ],
   controllers: [HealthController],

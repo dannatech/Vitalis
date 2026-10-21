@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient, Role, Sex } from '@prisma/client';
+import { PrismaClient, PayerType, Role, Sex, TariffCategory } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { encryptField } from '../src/common/crypto/field-crypto';
 
@@ -71,6 +71,7 @@ async function main() {
       licenseBody: 'PCN',
     },
     { email: 'labtech@demo-hospital.ng', fullName: 'Emeka Umeh', role: Role.LAB_TECH },
+    { email: 'billing@demo-hospital.ng', fullName: 'Chioma Eze', role: Role.BILLING_OFFICER },
   ];
 
   for (const member of staff) {
@@ -155,6 +156,84 @@ async function main() {
     });
   }
 
+  const selfPayPayer = await prisma.payer.upsert({
+    where: { facilityId_name: { facilityId: facility.id, name: 'Self-Pay' } },
+    update: {},
+    create: { facilityId: facility.id, name: 'Self-Pay', type: PayerType.SELF_PAY },
+  });
+
+  const nhisPayer = await prisma.payer.upsert({
+    where: { facilityId_name: { facilityId: facility.id, name: 'NHIS' } },
+    update: {},
+    create: {
+      facilityId: facility.id,
+      name: 'NHIS',
+      type: PayerType.NHIS,
+      contactInfo: 'claims@nhis.gov.ng',
+    },
+  });
+
+  const hmoPayer = await prisma.payer.upsert({
+    where: { facilityId_name: { facilityId: facility.id, name: 'Hygeia HMO' } },
+    update: {},
+    create: {
+      facilityId: facility.id,
+      name: 'Hygeia HMO',
+      type: PayerType.PRIVATE_HMO,
+      contactInfo: 'providers@hygeiahmo.com',
+    },
+  });
+
+  const tariffItems: { name: string; category: TariffCategory; unitPrice: number; code?: string }[] = [
+    { name: 'General Consultation', category: TariffCategory.CONSULTATION, unitPrice: 3000 },
+    { name: 'Specialist Consultation', category: TariffCategory.CONSULTATION, unitPrice: 8000 },
+    { name: 'Full Blood Count', category: TariffCategory.LAB, unitPrice: 2500, code: 'LAB-FBC' },
+    { name: 'Malaria Parasite Test', category: TariffCategory.LAB, unitPrice: 1500, code: 'LAB-MP' },
+    { name: 'Widal Test', category: TariffCategory.LAB, unitPrice: 2000, code: 'LAB-WIDAL' },
+    { name: 'Amoxicillin 500mg (per course)', category: TariffCategory.MEDICATION, unitPrice: 1200 },
+    { name: 'Artemether/Lumefantrine (per course)', category: TariffCategory.MEDICATION, unitPrice: 1800 },
+    { name: 'Paracetamol 500mg (per course)', category: TariffCategory.MEDICATION, unitPrice: 500 },
+    { name: 'Minor Procedure', category: TariffCategory.PROCEDURE, unitPrice: 5000 },
+    { name: 'Admission (per day)', category: TariffCategory.ADMISSION, unitPrice: 15000 },
+  ];
+
+  for (const item of tariffItems) {
+    const existing = await prisma.tariffItem.findFirst({
+      where: { facilityId: facility.id, name: item.name, payerId: null },
+    });
+    if (!existing) {
+      await prisma.tariffItem.create({
+        data: {
+          facilityId: facility.id,
+          name: item.name,
+          category: item.category,
+          unitPrice: item.unitPrice,
+          code: item.code,
+        },
+      });
+    }
+  }
+
+  const coveredPatient = await prisma.patient.findUniqueOrThrow({
+    where: { facilityId_mrn: { facilityId: facility.id, mrn: 'DGH-000001' } },
+  });
+  const existingCoverage = await prisma.patientCoverage.findFirst({
+    where: { patientId: coveredPatient.id, payerId: nhisPayer.id },
+  });
+  if (!existingCoverage) {
+    await prisma.patientCoverage.create({
+      data: {
+        patientId: coveredPatient.id,
+        payerId: nhisPayer.id,
+        enrolleeId: 'NHIS-ENR-00123',
+        planName: 'Formal Sector Social Health Insurance Programme',
+        isPrimary: true,
+      },
+    });
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`Payers: ${selfPayPayer.name}, ${nhisPayer.name}, ${hmoPayer.name}`);
   // eslint-disable-next-line no-console
   console.log('Seed complete.');
   // eslint-disable-next-line no-console

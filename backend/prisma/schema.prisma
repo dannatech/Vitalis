@@ -28,6 +28,10 @@ model Facility {
   encounters               Encounter[]
   auditLogs                AuditLog[]
   notifiableDiseaseReports NotifiableDiseaseReport[]
+  payers                   Payer[]
+  tariffItems              TariffItem[]
+  invoices                 Invoice[]
+  claims                   Claim[]
 
   @@map("facilities")
 }
@@ -70,6 +74,10 @@ model User {
   patientsRegistered    Patient[]          @relation("PatientRegisteredBy")
   auditLogs             AuditLog[]
   dataSubjectRequests   DataSubjectRequest[] @relation("DSRHandledBy")
+  chargeLinesCreated    ChargeLine[]
+  invoicesCreated       Invoice[]
+  paymentsReceived      Payment[]
+  claimsCreated         Claim[]
 
   @@map("users")
 }
@@ -132,6 +140,8 @@ model Patient {
   consentRecords       ConsentRecord[]
   dataSubjectRequests  DataSubjectRequest[]
   notifiableDiseaseReports NotifiableDiseaseReport[]
+  coverages           PatientCoverage[]
+  invoices            Invoice[]
 
   @@unique([facilityId, mrn])
   @@index([facilityId, surname, firstName])
@@ -246,6 +256,8 @@ model Encounter {
   diagnoses     Diagnosis[]
   prescriptions Prescription[]
   labOrders     LabOrder[]
+  chargeLines   ChargeLine[]
+  invoices      Invoice[]
 
   @@index([facilityId, visitDate])
   @@index([patientId, visitDate])
@@ -412,4 +424,225 @@ model AuditLog {
   @@index([patientId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Billing / NHIS & HMO claims
+//
+// Money fields use Float rather than Prisma's Decimal type: Decimal avoids
+// floating-point rounding error but doesn't serialize to JSON cleanly
+// through Nest/Prisma without extra transform plumbing. Acceptable for this
+// reference implementation; a production deployment handling real money
+// should switch to Decimal (or integer kobo) and add that transform.
+//
+// There is no standardised electronic claims-submission API across
+// Nigerian HMOs/NHIA, so "submitting" a claim here means exporting it
+// (see Claim export) for a human to submit through that payer's own
+// portal/process — not a live API call to any payer.
+// ---------------------------------------------------------------------------
+
+enum PayerType {
+  SELF_PAY
+  NHIS
+  STATE_SCHEME
+  PRIVATE_HMO
+}
+
+model Payer {
+  id          String    @id @default(uuid())
+  facilityId  String
+  facility    Facility  @relation(fields: [facilityId], references: [id])
+  name        String
+  type        PayerType
+  contactInfo String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  coverages   PatientCoverage[]
+  tariffItems TariffItem[]
+  invoices    Invoice[]
+  claims      Claim[]
+
+  @@unique([facilityId, name])
+  @@map("payers")
+}
+
+model PatientCoverage {
+  id         String    @id @default(uuid())
+  patientId  String
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  payerId    String
+  payer      Payer     @relation(fields: [payerId], references: [id])
+  enrolleeId String?
+  planName   String?
+  validFrom  DateTime?
+  validTo    DateTime?
+  isPrimary  Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  invoices   Invoice[]
+
+  @@index([patientId])
+  @@map("patient_coverages")
+}
+
+enum TariffCategory {
+  CONSULTATION
+  LAB
+  PROCEDURE
+  MEDICATION
+  ADMISSION
+  OTHER
+}
+
+/// Facility-maintained price list. A null payerId is the default/self-pay
+/// price; a row with payerId set is a negotiated rate for that specific
+/// payer, looked up in preference to the default when billing that payer.
+model TariffItem {
+  id         String         @id @default(uuid())
+  facilityId String
+  facility   Facility       @relation(fields: [facilityId], references: [id])
+  payerId    String?
+  payer      Payer?         @relation(fields: [payerId], references: [id])
+  code       String?
+  name       String
+  category   TariffCategory
+  unitPrice  Float
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+
+  chargeLines ChargeLine[]
+
+  @@map("tariff_items")
+}
+
+/// An itemized charge against an encounter. description/unitPrice are
+/// snapshotted at creation time (from the tariff item, or entered free-text)
+/// so a later tariff price change never rewrites an already-billed charge.
+model ChargeLine {
+  id           String      @id @default(uuid())
+  encounterId  String
+  encounter    Encounter   @relation(fields: [encounterId], references: [id])
+  tariffItemId String?
+  tariffItem   TariffItem? @relation(fields: [tariffItemId], references: [id])
+  description  String
+  quantity     Int         @default(1)
+  unitPrice    Float
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@map("charge_lines")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  FINALIZED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+model Invoice {
+  id         String   @id @default(uuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+  encounter   Encounter? @relation(fields: [encounterId], references: [id])
+
+  payerId String
+  payer   Payer  @relation(fields: [payerId], references: [id])
+
+  coverageId String?
+  coverage   PatientCoverage? @relation(fields: [coverageId], references: [id])
+
+  status        InvoiceStatus @default(DRAFT)
+  /// Sequential per-facility reference, assigned on finalize (e.g. INV-00001)
+  invoiceNumber String?
+  subtotal      Float         @default(0)
+  amountPaid    Float         @default(0)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  finalizedAt DateTime?
+
+  chargeLines ChargeLine[]
+  payments    Payment[]
+
+  claimId String?
+  claim   Claim?  @relation(fields: [claimId], references: [id])
+
+  @@unique([facilityId, invoiceNumber])
+  @@index([facilityId, status])
+  @@map("invoices")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  CAPITATION
+  OTHER
+}
+
+model Payment {
+  id         String        @id @default(uuid())
+  invoiceId  String
+  invoice    Invoice       @relation(fields: [invoiceId], references: [id])
+  amount     Float
+  method     PaymentMethod
+  reference  String?
+
+  receivedById String
+  receivedBy   User     @relation(fields: [receivedById], references: [id])
+  receivedAt   DateTime @default(now())
+
+  @@map("payments")
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PAID
+}
+
+/// A bundle of finalized invoices for one payer over a period, submitted as
+/// a single claim — the unit a facility actually sends to an HMO/NHIS.
+model Claim {
+  id          String   @id @default(uuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  payerId     String
+  payer       Payer    @relation(fields: [payerId], references: [id])
+
+  /// Sequential per-facility reference (e.g. CLM-00001)
+  claimNumber String
+  periodStart DateTime
+  periodEnd   DateTime
+
+  status          ClaimStatus @default(DRAFT)
+  submittedAt     DateTime?
+  adjudicatedAt   DateTime?
+  approvedAmount  Float?
+  rejectionReason String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  invoices Invoice[]
+
+  @@unique([facilityId, claimNumber])
+  @@map("claims")
 }

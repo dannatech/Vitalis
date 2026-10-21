@@ -16,6 +16,9 @@ export default function Layout() {
   // Mirrors the backend's GET /pharmacy/prescriptions RBAC.
   const canSeePharmacy =
     user && ['PHARMACIST', 'DOCTOR', 'NURSE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  // Mirrors the backend's @Roles() on the billing controllers.
+  const canSeeBilling =
+    user && ['BILLING_OFFICER', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
   function closeSidebar() {
     setSidebarOpen(false);
@@ -54,6 +57,11 @@ export default function Layout() {
             {canSeePharmacy && (
               <NavLink to="/pharmacy" onClick={closeSidebar}>
                 Pharmacy
+              </NavLink>
+            )}
+            {canSeeBilling && (
+              <NavLink to="/billing" onClick={closeSidebar}>
+                Billing
               </NavLink>
             )}
             {isAdmin && (

@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PayersService } from '../billing/payers.service';
 
 type Tx = {
   facility: { create: jest.Mock };
@@ -17,6 +18,7 @@ describe('AuthService', () => {
     $transaction: jest.Mock;
   };
   let jwt: { sign: jest.Mock };
+  let payersService: { ensureSelfPayPayer: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -24,12 +26,14 @@ describe('AuthService', () => {
       $transaction: jest.fn(),
     };
     jwt = { sign: jest.fn(() => 'signed.jwt.token') };
+    payersService = { ensureSelfPayPayer: jest.fn().mockResolvedValue({ id: 'payer-self-pay' }) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwt },
+        { provide: PayersService, useValue: payersService },
       ],
     }).compile();
 
@@ -163,6 +167,7 @@ describe('AuthService', () => {
       );
       expect(result.accessToken).toBe('signed.jwt.token');
       expect(result.user).toMatchObject({ id: 'user-1', role: Role.ADMIN, facilityId: 'facility-1' });
+      expect(payersService.ensureSelfPayPayer).toHaveBeenCalledWith('facility-1');
     });
   });
 });

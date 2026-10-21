@@ -185,3 +185,106 @@ export interface PrescriptionWorklistEntry {
   dispensedAt: string | null;
   createdAt: string;
 }
+
+/** ---- Billing / NHIS claims ---- */
+
+export type PayerType = 'SELF_PAY' | 'NHIS' | 'STATE_SCHEME' | 'PRIVATE_HMO';
+export type TariffCategory =
+  | 'CONSULTATION'
+  | 'LAB'
+  | 'PROCEDURE'
+  | 'MEDICATION'
+  | 'ADMISSION'
+  | 'OTHER';
+export type InvoiceStatus = 'DRAFT' | 'FINALIZED' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+export type PaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CAPITATION' | 'OTHER';
+export type ClaimStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PARTIALLY_APPROVED' | 'REJECTED' | 'PAID';
+
+export interface Payer {
+  id: string;
+  name: string;
+  type: PayerType;
+  contactInfo: string | null;
+  isActive: boolean;
+}
+
+export interface TariffItem {
+  id: string;
+  name: string;
+  category: TariffCategory;
+  unitPrice: number;
+  code: string | null;
+  payerId: string | null;
+  isActive: boolean;
+}
+
+export interface PatientCoverage {
+  id: string;
+  patientId: string;
+  payerId: string;
+  payer: { name: string; type: PayerType };
+  enrolleeId: string | null;
+  planName: string | null;
+  isPrimary: boolean;
+}
+
+export interface ChargeLine {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  tariffItemId: string | null;
+  createdAt: string;
+}
+
+export interface InvoicePayment {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  reference: string | null;
+  receivedAt: string;
+}
+
+/** One row of GET /billing/invoices. */
+export interface InvoiceListEntry {
+  id: string;
+  invoiceNumber: string | null;
+  status: InvoiceStatus;
+  subtotal: number;
+  amountPaid: number;
+  createdAt: string;
+  patient: { id: string; mrn: string; surname: string; firstName: string };
+  payer: { id: string; name: string; type: PayerType };
+}
+
+/** GET /billing/invoices/:id. */
+export interface InvoiceDetail extends InvoiceListEntry {
+  chargeLines: ChargeLine[];
+  payments: InvoicePayment[];
+}
+
+/** One row of GET /billing/claims (and the shape returned by generate/submit/adjudicate/mark-paid). */
+export interface ClaimListEntry {
+  id: string;
+  claimNumber: string;
+  status: ClaimStatus;
+  periodStart: string;
+  periodEnd: string;
+  approvedAmount: number | null;
+  rejectionReason: string | null;
+  totalAmount: number;
+  payer: { id: string; name: string; type: PayerType };
+}
+
+export interface ClaimInvoiceEntry {
+  id: string;
+  invoiceNumber: string | null;
+  status: InvoiceStatus;
+  subtotal: number;
+  patient: { id: string; mrn: string; surname: string; firstName: string };
+}
+
+/** GET /billing/claims/:id. */
+export interface ClaimDetail extends ClaimListEntry {
+  invoices: ClaimInvoiceEntry[];
+}

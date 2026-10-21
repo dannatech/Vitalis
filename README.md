@@ -66,6 +66,9 @@ App runs on `http://localhost:5173`.
 | Doctor | doctor@demo-hospital.ng | ChangeMe123! |
 | Nurse | nurse@demo-hospital.ng | ChangeMe123! |
 | Records Officer | records@demo-hospital.ng | ChangeMe123! |
+| Pharmacist | pharmacist@demo-hospital.ng | ChangeMe123! |
+| Lab Tech | labtech@demo-hospital.ng | ChangeMe123! |
+| Billing Officer | billing@demo-hospital.ng | ChangeMe123! |
 
 **Change these before any real deployment.**
 
@@ -79,6 +82,13 @@ App runs on `http://localhost:5173`.
 - NDPR consent capture and data-subject access/erasure requests
 - Append-only audit logging of all access to patient data
 - NCDC notifiable-disease flagging for reportable diagnoses
+- Facility-wide pharmacy dispensing worklist (`/pharmacy`)
+- Billing & NHIS/HMO claims (`/billing`): patient invoicing with a facility
+  price list, payments, patient insurance coverage, and a claims workflow
+  (bundle finalized invoices per payer/period → submit → adjudicate →
+  mark paid, with CSV export) — there's no standardized electronic claims
+  submission API across Nigerian payers, so this produces the bundle and
+  export a billing officer submits manually per payer's own process
 - Offline-first sync: the frontend queues writes locally and syncs when back online
 
 ## Tests
@@ -146,8 +156,7 @@ GitHub Pages doesn't support.
 
 ## Roadmap (not yet built)
 
-- Billing / NHIS & private HMO claims submission
 - Full HL7 FHIR resource export for the Nigeria Health Data Exchange
 - SMS/USSD patient reminders (common last-mile channel in Nigeria)
-- Pharmacy inventory & dispensing workflow
+- Pharmacy stock/inventory tracking (dispensing itself is built — see Core modules)
 - Multi-facility referral workflow

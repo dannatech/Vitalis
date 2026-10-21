@@ -614,6 +614,42 @@ button.secondary:hover {
   color: var(--danger);
 }
 
+.badge.success {
+  background: var(--primary);
+  color: #fff;
+}
+
+.page-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.page-tabs button {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0.6rem 0.2rem;
+  margin-right: 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.page-tabs button:hover {
+  color: var(--text);
+  background: none;
+}
+
+.page-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+
 .inline-form {
   display: flex;
   flex-wrap: wrap;
