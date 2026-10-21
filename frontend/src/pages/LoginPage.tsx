@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginDemo } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('doctor@demo-hospital.ng');
   const [password, setPassword] = useState('');
@@ -22,6 +22,11 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handlePreview() {
+    await loginDemo();
+    navigate('/');
   }
 
   return (
@@ -51,6 +56,16 @@ export default function LoginPage() {
         <button type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <div className="divider">or</div>
+
+        <button type="button" className="secondary" onClick={handlePreview}>
+          Preview without login (sample data)
+        </button>
+        <p className="hint" style={{ marginBottom: 0 }}>
+          Shows the UI with fake sample patients only — no real backend, no real patient data.
+          Not a substitute for signing in with a real account.
+        </p>
       </form>
     </div>
   );

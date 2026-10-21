@@ -136,6 +136,32 @@ button.secondary {
   margin-bottom: 1rem;
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0.25rem 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.demo-banner {
+  background: #fef3c7;
+  color: var(--warning);
+  text-align: center;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

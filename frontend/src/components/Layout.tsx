@@ -3,10 +3,15 @@ import { useAuth } from '../auth/AuthContext';
 import NetworkStatusBadge from './NetworkStatusBadge';
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, isDemo, logout } = useAuth();
 
   return (
     <div className="app-shell">
+      {isDemo && (
+        <div className="demo-banner">
+          Preview mode — sample data only, not connected to a real backend
+        </div>
+      )}
       <header className="app-header">
         <div className="brand">Vitalis</div>
         <nav>
