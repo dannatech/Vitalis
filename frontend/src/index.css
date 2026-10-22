@@ -291,6 +291,14 @@ button.secondary:hover {
   flex-direction: column;
   gap: 1.75rem;
   padding: 1.25rem 1rem;
+  transition: width 0.2s ease, padding 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 72px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
 }
 
 .sidebar-logo {
@@ -300,6 +308,15 @@ button.secondary:hover {
   padding: 0 0.25rem;
 }
 
+.sidebar.collapsed .sidebar-logo {
+  padding: 0;
+  justify-content: center;
+}
+
+.sidebar.collapsed .logo-wordmark {
+  display: none;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -307,13 +324,40 @@ button.secondary:hover {
 }
 
 .sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.92rem;
   font-weight: 500;
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, padding 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-nav a {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.sidebar-link-icon {
+  flex-shrink: 0;
+}
+
+.sidebar-link-label {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity 0.12s ease, max-width 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-link-label {
+  opacity: 0;
+  max-width: 0;
 }
 
 .sidebar-nav a:hover {
@@ -324,6 +368,41 @@ button.secondary:hover {
 .sidebar-nav a.active {
   background: var(--primary);
   color: white;
+}
+
+.sidebar-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: auto;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.sidebar.collapsed .sidebar-collapse-toggle {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.sidebar-collapse-toggle:hover {
+  background: var(--primary-soft);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.sidebar-collapse-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-collapse-icon {
+  transform: rotate(180deg);
 }
 
 .sidebar-backdrop {
@@ -406,6 +485,32 @@ button.secondary:hover {
 
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  /* The mobile drawer is an overlay, not a persistent rail — always show
+     it full-width regardless of the desktop collapse preference. */
+  .sidebar,
+  .sidebar.collapsed {
+    width: 230px;
+    padding: 1.25rem 1rem;
+  }
+
+  .sidebar.collapsed .sidebar-logo {
+    padding: 0 0.25rem;
+    justify-content: flex-start;
+  }
+
+  .sidebar.collapsed .logo-wordmark {
+    display: inline;
+  }
+
+  .sidebar.collapsed .sidebar-link-label {
+    opacity: 1;
+    max-width: 160px;
+  }
+
+  .sidebar-collapse-toggle {
+    display: none;
   }
 
   .sidebar-backdrop {

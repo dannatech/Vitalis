@@ -3,10 +3,31 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import NetworkStatusBadge from './NetworkStatusBadge';
 import Logo from './Logo';
+import {
+  BillingIcon,
+  ChevronCollapseIcon,
+  DashboardIcon,
+  LabsIcon,
+  NcdcIcon,
+  PatientsIcon,
+  PharmacyIcon,
+  StaffIcon,
+} from './NavIcons';
+
+const SIDEBAR_COLLAPSED_KEY = 'vitalis.sidebarCollapsed';
+
+function getStoredCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export default function Layout() {
   const { user, isDemo, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(getStoredCollapsed);
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   // Mirrors the backend's GET /ncdc-reports RBAC — pharmacy/lab/billing
   // roles have no clinical or compliance reason to see this worklist.
@@ -24,6 +45,18 @@ export default function Layout() {
     setSidebarOpen(false);
   }
 
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        // per-viewer convenience only — fine if storage is unavailable
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="app-shell">
       {isDemo && (
@@ -35,41 +68,59 @@ export default function Layout() {
       <div className="app-body">
         {sidebarOpen && <div className="sidebar-backdrop" onClick={closeSidebar} />}
 
-        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
           <Link to="/dashboard" className="sidebar-logo" onClick={closeSidebar}>
             <Logo withWordmark size={26} />
           </Link>
           <nav className="sidebar-nav">
-            <NavLink to="/dashboard" onClick={closeSidebar}>
-              Dashboard
+            <NavLink to="/dashboard" onClick={closeSidebar} title="Dashboard">
+              <DashboardIcon className="sidebar-link-icon" />
+              <span className="sidebar-link-label">Dashboard</span>
             </NavLink>
-            <NavLink to="/patients" onClick={closeSidebar}>
-              Patients
+            <NavLink to="/patients" onClick={closeSidebar} title="Patients">
+              <PatientsIcon className="sidebar-link-icon" />
+              <span className="sidebar-link-label">Patients</span>
             </NavLink>
-            <NavLink to="/labs" onClick={closeSidebar}>
-              Labs
+            <NavLink to="/labs" onClick={closeSidebar} title="Labs">
+              <LabsIcon className="sidebar-link-icon" />
+              <span className="sidebar-link-label">Labs</span>
             </NavLink>
             {canSeeNcdcReports && (
-              <NavLink to="/ncdc-reports" onClick={closeSidebar}>
-                NCDC Reports
+              <NavLink to="/ncdc-reports" onClick={closeSidebar} title="NCDC Reports">
+                <NcdcIcon className="sidebar-link-icon" />
+                <span className="sidebar-link-label">NCDC Reports</span>
               </NavLink>
             )}
             {canSeePharmacy && (
-              <NavLink to="/pharmacy" onClick={closeSidebar}>
-                Pharmacy
+              <NavLink to="/pharmacy" onClick={closeSidebar} title="Pharmacy">
+                <PharmacyIcon className="sidebar-link-icon" />
+                <span className="sidebar-link-label">Pharmacy</span>
               </NavLink>
             )}
             {canSeeBilling && (
-              <NavLink to="/billing" onClick={closeSidebar}>
-                Billing
+              <NavLink to="/billing" onClick={closeSidebar} title="Billing">
+                <BillingIcon className="sidebar-link-icon" />
+                <span className="sidebar-link-label">Billing</span>
               </NavLink>
             )}
             {isAdmin && (
-              <NavLink to="/staff" onClick={closeSidebar}>
-                Staff
+              <NavLink to="/staff" onClick={closeSidebar} title="Staff">
+                <StaffIcon className="sidebar-link-icon" />
+                <span className="sidebar-link-label">Staff</span>
               </NavLink>
             )}
           </nav>
+
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            <ChevronCollapseIcon className="sidebar-collapse-icon" />
+            <span className="sidebar-link-label">Collapse</span>
+          </button>
         </aside>
 
         <div className="app-main">
