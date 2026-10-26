@@ -92,3 +92,11 @@ export function ChevronCollapseIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg {...common} width={18} height={18} className={className}>
+      <path d="M5 5l10 10M15 5 5 15" {...stroke} />
+    </svg>
+  );
+}

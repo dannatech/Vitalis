@@ -301,6 +301,16 @@ button.secondary:hover {
   padding-right: 0.75rem;
 }
 
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar.collapsed .sidebar-top {
+  justify-content: center;
+}
+
 .sidebar-logo {
   display: inline-flex;
   color: inherit;
@@ -315,6 +325,21 @@ button.secondary:hover {
 
 .sidebar.collapsed .logo-wordmark {
   display: none;
+}
+
+.sidebar-close {
+  display: none;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.35rem;
+  box-shadow: none;
+}
+
+.sidebar-close:hover {
+  background: var(--primary-soft);
+  color: var(--text);
+  box-shadow: none;
 }
 
 .sidebar-nav {
@@ -495,6 +520,10 @@ button.secondary:hover {
     padding: 1.25rem 1rem;
   }
 
+  .sidebar.collapsed .sidebar-top {
+    justify-content: space-between;
+  }
+
   .sidebar.collapsed .sidebar-logo {
     padding: 0 0.25rem;
     justify-content: flex-start;
@@ -511,6 +540,12 @@ button.secondary:hover {
 
   .sidebar-collapse-toggle {
     display: none;
+  }
+
+  .sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .sidebar-backdrop {

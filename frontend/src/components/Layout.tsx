@@ -6,6 +6,7 @@ import Logo from './Logo';
 import {
   BillingIcon,
   ChevronCollapseIcon,
+  CloseIcon,
   DashboardIcon,
   LabsIcon,
   NcdcIcon,
@@ -69,9 +70,19 @@ export default function Layout() {
         {sidebarOpen && <div className="sidebar-backdrop" onClick={closeSidebar} />}
 
         <aside className={`sidebar ${sidebarOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-          <Link to="/dashboard" className="sidebar-logo" onClick={closeSidebar}>
-            <Logo withWordmark size={26} />
-          </Link>
+          <div className="sidebar-top">
+            <Link to="/dashboard" className="sidebar-logo" onClick={closeSidebar}>
+              <Logo withWordmark size={26} />
+            </Link>
+            <button
+              type="button"
+              className="sidebar-close"
+              onClick={closeSidebar}
+              aria-label="Close navigation"
+            >
+              <CloseIcon />
+            </button>
+          </div>
           <nav className="sidebar-nav">
             <NavLink to="/dashboard" onClick={closeSidebar} title="Dashboard">
               <DashboardIcon className="sidebar-link-icon" />
