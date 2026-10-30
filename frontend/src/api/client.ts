@@ -2,8 +2,12 @@ import axios from 'axios';
 
 export const AUTH_STORAGE_KEY = 'vitalis.auth';
 
+// `||`, not `??` — an empty-string env value (e.g. a GitHub Actions
+// variable that exists but was saved blank) must also fall through to the
+// default, or axios silently treats API paths as relative to the current
+// page instead of the backend.
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
 });
 
 apiClient.interceptors.request.use((config) => {
