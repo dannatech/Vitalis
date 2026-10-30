@@ -8,10 +8,14 @@ import { CreateDiagnosisDto } from './dto/create-diagnosis.dto';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { CreateLabResultDto } from './dto/create-lab-result.dto';
+import { EncounterSummaryService } from '../sms/encounter-summary.service';
 
 @Injectable()
 export class EncountersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encounterSummary: EncounterSummaryService,
+  ) {}
 
   async create(dto: CreateEncounterDto, actor: AuthenticatedUser) {
     if (dto.clientGeneratedId) {
@@ -57,10 +61,16 @@ export class EncountersService {
 
   async close(id: string, actor: AuthenticatedUser) {
     await this.assertEncounterInFacility(id, actor);
-    return this.prisma.encounter.update({
+    const encounter = await this.prisma.encounter.update({
       where: { id },
       data: { status: EncounterStatus.CLOSED },
     });
+
+    // Fire-and-forget: an SMS provider outage must never block or fail
+    // closing an encounter. Failures are caught and logged internally.
+    void this.encounterSummary.notifyEncounterClosed(id);
+
+    return encounter;
   }
 
   async addVitals(encounterId: string, dto: CreateVitalsDto, actor: AuthenticatedUser) {

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { EncountersService } from './encounters.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncounterSummaryService } from '../sms/encounter-summary.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 const ACTOR: AuthenticatedUser = {
@@ -21,7 +22,7 @@ const ENCOUNTER = {
 describe('EncountersService', () => {
   let service: EncountersService;
   let prisma: {
-    encounter: { findFirst: jest.Mock };
+    encounter: { findFirst: jest.Mock; update: jest.Mock };
     notifiableDisease: { findUnique: jest.Mock };
     diagnosis: { create: jest.Mock };
     notifiableDiseaseReport: { create: jest.Mock };
@@ -29,10 +30,11 @@ describe('EncountersService', () => {
     labResult: { create: jest.Mock };
     $transaction: jest.Mock;
   };
+  let encounterSummary: { notifyEncounterClosed: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
-      encounter: { findFirst: jest.fn() },
+      encounter: { findFirst: jest.fn(), update: jest.fn() },
       notifiableDisease: { findUnique: jest.fn() },
       diagnosis: { create: jest.fn() },
       notifiableDiseaseReport: { create: jest.fn() },
@@ -40,12 +42,41 @@ describe('EncountersService', () => {
       labResult: { create: jest.fn() },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
+    encounterSummary = { notifyEncounterClosed: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [EncountersService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        EncountersService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: EncounterSummaryService, useValue: encounterSummary },
+      ],
     }).compile();
 
     service = moduleRef.get(EncountersService);
+  });
+
+  describe('close', () => {
+    it('closes the encounter and fires the SMS summary notification', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.encounter.update.mockResolvedValue({ ...ENCOUNTER, status: 'CLOSED' });
+
+      const result = await service.close('encounter-1', ACTOR);
+
+      expect(prisma.encounter.update).toHaveBeenCalledWith({
+        where: { id: 'encounter-1' },
+        data: { status: 'CLOSED' },
+      });
+      expect(result).toEqual({ ...ENCOUNTER, status: 'CLOSED' });
+      expect(encounterSummary.notifyEncounterClosed).toHaveBeenCalledWith('encounter-1');
+    });
+
+    it('rejects closing an encounter outside the actor\'s facility', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(null);
+
+      await expect(service.close('encounter-1', ACTOR)).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.encounter.update).not.toHaveBeenCalled();
+      expect(encounterSummary.notifyEncounterClosed).not.toHaveBeenCalled();
+    });
   });
 
   describe('addDiagnosis — NCDC notifiable-disease flagging', () => {

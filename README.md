@@ -90,6 +90,12 @@ App runs on `http://localhost:5173`.
   submission API across Nigerian payers, so this produces the bundle and
   export a billing officer submits manually per payer's own process
 - Offline-first sync: the frontend queues writes locally and syncs when back online
+- SMS visit summaries: when a doctor closes an encounter, the patient gets an SMS
+  (via [Termii](https://termii.com)) summarising the visit — facility, date,
+  diagnosis, medication, and a short notes excerpt. Sending is fire-and-forget
+  (never blocks or fails closing the encounter) and is skipped silently if
+  `TERMII_API_KEY`/`TERMII_SENDER_ID` aren't configured or the patient has no
+  phone number on file.
 
 ## Tests
 
@@ -133,6 +139,9 @@ string (port 5432) as described above. Render will reuse this same database.
      locally when you ran `npm run seed` (it decrypts NIN/phone fields
      already encrypted with that key — a different key can't read them back).
    - `CORS_ORIGINS` — your GitHub Pages origin, e.g. `https://<owner>.github.io`.
+   - `TERMII_API_KEY` / `TERMII_SENDER_ID` — optional. Enables the SMS visit
+     summary sent when an encounter is closed (see Core modules above).
+     Leave both unset to disable it — nothing else depends on these.
 4. Deploy. Render builds and runs `prisma migrate deploy` automatically on
    each deploy. Note the service URL, e.g. `https://vitalis-api.onrender.com`.
 

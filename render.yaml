@@ -38,3 +38,12 @@ services:
       # Your GitHub Pages origin, e.g. https://dannatech.github.io
       - key: CORS_ORIGINS
         sync: false
+      # Termii (https://termii.com) API key — sends patients an SMS visit
+      # summary when an encounter is closed. Leave both Termii vars unset to
+      # disable SMS sending; it's skipped (with a warning log) rather than
+      # failing the request.
+      - key: TERMII_API_KEY
+        sync: false
+      # Must be a sender ID registered/approved in your Termii dashboard.
+      - key: TERMII_SENDER_ID
+        sync: false

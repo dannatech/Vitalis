@@ -17,6 +17,16 @@ where required, registered with the Nigeria Data Protection Commission (NDPC).
 | Data Protection Officer / breach notice | Out of scope for the codebase — organisational process. `COMPLIANCE.md` flag left here as a reminder to appoint a DPO and register with NDPC per the Act. |
 | Cross-border transfer | The system defaults to a single-region PostgreSQL instance. If deploying on cloud infra, keep the database in-country (or a jurisdiction with adequate protection per NDPC guidance) — documented in `.env.example` as a deployment note. |
 
+**Third-party processor note:** closing an encounter sends the patient an SMS
+visit summary via Termii (`backend/src/sms/`), which means a patient's name,
+diagnosis and medication are disclosed to that SMS gateway as a data
+processor under the Act. This relies on the same treatment lawful basis as
+the rest of clinical care — it is not an additional marketing/research use —
+but a real deployment should have a Termii data-processing agreement on file
+and disclose this channel in the facility's NDPR privacy notice. Sending is
+skipped entirely if the patient has no phone number on file, and a send
+failure never blocks or is retried against the clinical record.
+
 ## 2. NHIS / NHIA & HMO alignment
 
 - `Patient.nhisNumber` captures the National Health Insurance Authority enrollee number.
@@ -24,8 +34,11 @@ where required, registered with the Nigeria Data Protection Commission (NDPC).
 - Data model is intentionally close to FHIR `Patient`/`Encounter`/`Condition`/
   `MedicationRequest`/`ServiceRequest` shapes so that a future export to the Nigeria
   Health Data Exchange / FHIR profiles is a mapping exercise, not a rewrite.
-- Billing/claims submission is **not yet implemented** (see README roadmap) — the data
-  model has the identifiers claims workflows need, but no claims module exists yet.
+- Billing and claims (`backend/src/billing/`) cover facility invoicing, payments, and a
+  claims workflow that bundles finalized invoices per payer/period for submission —
+  see README's Core modules. There is no standardized electronic claims submission API
+  across Nigerian payers, so the claims workflow produces a bundle/CSV export a billing
+  officer still submits manually per payer's own process.
 
 ## 3. Medical record retention vs. "right to erasure"
 
