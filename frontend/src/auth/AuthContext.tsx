@@ -9,13 +9,9 @@ import {
 } from 'react';
 import apiClient, { AUTH_STORAGE_KEY } from '../api/client';
 import type { AuthUser } from '../api/types';
+import { clearAllLocalData } from '../db/offlineDb';
 import { startSyncEngine, stopSyncEngine } from '../sync/syncEngine';
-import {
-  DEMO_FACILITY_ID,
-  DEMO_MODE_STORAGE_KEY,
-  clearDemoData,
-  seedDemoData,
-} from '../demo/seedDemoData';
+import { DEMO_FACILITY_ID, DEMO_MODE_STORAGE_KEY, seedDemoData } from '../demo/seedDemoData';
 
 interface StoredAuth {
   accessToken: string;
@@ -73,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post<StoredAuth>('/auth/login', { email, password });
-    await clearDemoData();
+    await clearAllLocalData();
     localStorage.removeItem(DEMO_FLAG_KEY);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
     setUser(data.user);
@@ -83,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const { data } = await apiClient.post<StoredAuth>('/auth/register', payload);
-    await clearDemoData();
+    await clearAllLocalData();
     localStorage.removeItem(DEMO_FLAG_KEY);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
     setUser(data.user);
@@ -116,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsDemo(false);
     stopSyncEngine();
-    void clearDemoData();
+    void clearAllLocalData();
   }, []);
 
   const value = useMemo(

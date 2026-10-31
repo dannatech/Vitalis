@@ -1,4 +1,4 @@
-import { db } from '../db/offlineDb';
+import { clearAllLocalData, db } from '../db/offlineDb';
 import type { Encounter, Patient } from '../api/types';
 import { DEMO_FACILITY_ID } from './demoModeFlag';
 
@@ -10,10 +10,10 @@ export { DEMO_FACILITY_ID, DEMO_MODE_STORAGE_KEY } from './demoModeFlag';
  * IndexedDB cache so the UI has something to show. Clearly fake patients,
  * fixed ids, easy to tell apart from anything synced from a real backend.
  */
-const DEMO_PATIENT_IDS = ['demo-patient-1', 'demo-patient-2'];
-const DEMO_ENCOUNTER_IDS = ['demo-encounter-1'];
-
 export async function seedDemoData(): Promise<void> {
+  // Clear first: a previous real session's patients/encounters must never
+  // show up under a demo session on the same device.
+  await clearAllLocalData();
   const now = new Date().toISOString();
 
   const patients: Patient[] = [
@@ -85,9 +85,4 @@ export async function seedDemoData(): Promise<void> {
 
   await db.patients.bulkPut(patients);
   await db.encounters.bulkPut(encounters);
-}
-
-export async function clearDemoData(): Promise<void> {
-  await db.patients.bulkDelete(DEMO_PATIENT_IDS);
-  await db.encounters.bulkDelete(DEMO_ENCOUNTER_IDS);
 }

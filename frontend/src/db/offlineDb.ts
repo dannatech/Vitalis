@@ -52,3 +52,29 @@ class VitalisDb extends Dexie {
 }
 
 export const db = new VitalisDb();
+
+/**
+ * Wipes the entire local cache + outbox. Called on every session
+ * transition (login, register, loginDemo, logout) so a previous session's
+ * records — real or demo — never leak into the next one on a shared
+ * device. Demo-mode writes in particular use crypto.randomUUID() ids with
+ * no facilityId set, so there is no reliable way to selectively delete
+ * "just the demo rows"; a full clear is the only correct fix.
+ */
+export async function clearAllLocalData(): Promise<void> {
+  await db.transaction(
+    'rw',
+    db.patients,
+    db.encounters,
+    db.outboxPatients,
+    db.outboxEncounters,
+    db.meta,
+    async () => {
+      await db.patients.clear();
+      await db.encounters.clear();
+      await db.outboxPatients.clear();
+      await db.outboxEncounters.clear();
+      await db.meta.clear();
+    },
+  );
+}
