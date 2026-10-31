@@ -6,6 +6,7 @@ import apiClient from '../api/client';
 import type { EncounterDetail } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import BackButton from '../components/BackButton';
+import { searchIcd10, type Icd10Entry } from '../data/icd10Reference';
 
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -211,8 +212,19 @@ function DiagnosesSection({
 }) {
   const [icd10Code, setIcd10Code] = useState('');
   const [description, setDescription] = useState('');
+  const [search, setSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const suggestions = showSuggestions ? searchIcd10(search) : [];
+
+  function pickSuggestion(entry: Icd10Entry) {
+    setIcd10Code(entry.code);
+    setDescription(entry.description);
+    setSearch(`${entry.code} — ${entry.description}`);
+    setShowSuggestions(false);
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -222,6 +234,7 @@ function DiagnosesSection({
       await apiClient.post(`/encounters/${encounterId}/diagnoses`, { icd10Code, description });
       setIcd10Code('');
       setDescription('');
+      setSearch('');
       onSaved();
     } catch {
       setError('Could not save diagnosis — try again.');
@@ -249,13 +262,50 @@ function DiagnosesSection({
       {canEdit ? (
         <>
           {error && <div className="error-banner">{error}</div>}
+          <div className="icd10-picker">
+            <input
+              placeholder="Search diagnosis (e.g. malaria, B50, hypertension)…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+            {suggestions.length > 0 && (
+              <ul className="icd10-suggestions">
+                {suggestions.map((entry) => (
+                  <li key={entry.code}>
+                    <button type="button" onMouseDown={() => pickSuggestion(entry)}>
+                      <strong>{entry.code}</strong> — {entry.description}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <form className="inline-form" onSubmit={submit}>
-            <input placeholder="ICD-10 code" value={icd10Code} onChange={(e) => setIcd10Code(e.target.value)} required />
-            <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            <input
+              placeholder="ICD-10 code"
+              value={icd10Code}
+              onChange={(e) => setIcd10Code(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
             <button type="submit" disabled={saving}>
               Add diagnosis
             </button>
           </form>
+          <p className="muted-inline">
+            Search picks from a Sub-Saharan Africa ICD-10 reference — not every diagnosis is
+            listed, so you can always type the code and description directly below.
+          </p>
         </>
       ) : (
         <p className="hint">Only doctors can record diagnoses.</p>

@@ -12,6 +12,7 @@ import {
   NcdcIcon,
   PatientsIcon,
   PharmacyIcon,
+  ReferenceIcon,
   StaffIcon,
 } from './NavIcons';
 
@@ -95,6 +96,10 @@ export default function Layout() {
             <NavLink to="/labs" onClick={closeSidebar} title="Labs">
               <LabsIcon className="sidebar-link-icon" />
               <span className="sidebar-link-label">Labs</span>
+            </NavLink>
+            <NavLink to="/icd10-reference" onClick={closeSidebar} title="ICD-10 Reference">
+              <ReferenceIcon className="sidebar-link-icon" />
+              <span className="sidebar-link-label">ICD-10 Reference</span>
             </NavLink>
             {canSeeNcdcReports && (
               <NavLink to="/ncdc-reports" onClick={closeSidebar} title="NCDC Reports">

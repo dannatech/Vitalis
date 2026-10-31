@@ -96,6 +96,13 @@ App runs on `http://localhost:5173`.
   (never blocks or fails closing the encounter) and is skipped silently if
   `TERMII_API_KEY`/`TERMII_SENDER_ID` aren't configured or the patient has no
   phone number on file.
+- ICD-10 reference (`/icd10-reference`): a curated Sub-Saharan Africa clinical
+  reference (not the full ICD-10 standard) — epidemic-prone/NCDC-notifiable
+  disease, common tropical/parasitic conditions, maternal & child health, and
+  the growing noncommunicable disease burden. Powers a searchable picker on
+  the encounter Diagnoses form so clinicians pick a diagnosis instead of
+  hand-typing a code — which also makes NCDC auto-flagging (exact-code match)
+  more reliable than free-typed codes.
 
 ## Tests
 

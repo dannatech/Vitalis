@@ -100,3 +100,12 @@ export function CloseIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function ReferenceIcon({ className }: IconProps) {
+  return (
+    <svg {...common} className={className}>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H15v14H5.5A1.5 1.5 0 0 0 4 18.5v-14Z" {...stroke} />
+      <path d="M7 7h6M7 10h6" {...stroke} />
+    </svg>
+  );
+}
