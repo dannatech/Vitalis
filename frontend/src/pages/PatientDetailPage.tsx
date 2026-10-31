@@ -3,11 +3,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { clientIdFromLocalId, db } from '../db/offlineDb';
 import { runSync } from '../sync/syncEngine';
+import { useAuth } from '../auth/AuthContext';
 import BackButton from '../components/BackButton';
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Mirrors the backend's @Roles() on POST /encounters.
+  const canCreateEncounter = user?.role === 'DOCTOR' || user?.role === 'NURSE';
 
   useEffect(() => {
     void runSync();
@@ -68,9 +72,11 @@ export default function PatientDetailPage() {
             Pending sync
           </span>
         ) : (
-          <Link className="button" to={`/patients/${patient.id}/encounters/new`}>
-            New encounter
-          </Link>
+          canCreateEncounter && (
+            <Link className="button" to={`/patients/${patient.id}/encounters/new`}>
+              New encounter
+            </Link>
+          )
         )}
       </div>
 

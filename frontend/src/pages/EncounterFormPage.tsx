@@ -9,10 +9,13 @@ import BackButton from '../components/BackButton';
 export default function EncounterFormPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
-  const { isDemo } = useAuth();
+  const { isDemo, user } = useAuth();
   const [type, setType] = useState<EncounterType>('OUTPATIENT');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Mirrors the backend's @Roles() on POST /encounters.
+  const canCreateEncounter = user?.role === 'DOCTOR' || user?.role === 'NURSE';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -59,6 +62,16 @@ export default function EncounterFormPage() {
 
     void runSync();
     navigate(`/encounters/${optimisticEncounter.id}`);
+  }
+
+  if (!canCreateEncounter) {
+    return (
+      <div>
+        <BackButton fallback={patientId ? `/patients/${patientId}` : '/patients'} />
+        <h1>New encounter</h1>
+        <p className="hint">Only doctors and nurses can start a new encounter.</p>
+      </div>
+    );
   }
 
   return (
