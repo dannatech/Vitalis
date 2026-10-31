@@ -10,8 +10,14 @@ import BackButton from '../components/BackButton';
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isDemo } = useAuth();
+  const { isDemo, user } = useAuth();
   const directEncounter = useLiveQuery(() => (id ? db.encounters.get(id) : undefined), [id]);
+
+  // Mirrors the backend's @Roles() on each POST /encounters/:id/... route.
+  const canAddVitals = user?.role === 'DOCTOR' || user?.role === 'NURSE';
+  const canAddDiagnosis = user?.role === 'DOCTOR';
+  const canAddPrescription = user?.role === 'DOCTOR';
+  const canAddLabOrder = user?.role === 'DOCTOR';
 
   // Same rationale as PatientDetailPage: an offline-created encounter's temp
   // "local-…" row is replaced by the canonical server record once it syncs.
@@ -82,14 +88,30 @@ export default function EncounterDetailPage() {
 
       {!isUnsynced && !isDemo && detail && (
         <>
-          <VitalsSection encounterId={id_!} vitals={detail.vitals} onSaved={loadDetail} />
-          <DiagnosesSection encounterId={id_!} diagnoses={detail.diagnoses} onSaved={loadDetail} />
+          <VitalsSection
+            encounterId={id_!}
+            vitals={detail.vitals}
+            onSaved={loadDetail}
+            canEdit={canAddVitals}
+          />
+          <DiagnosesSection
+            encounterId={id_!}
+            diagnoses={detail.diagnoses}
+            onSaved={loadDetail}
+            canEdit={canAddDiagnosis}
+          />
           <PrescriptionsSection
             encounterId={id_!}
             prescriptions={detail.prescriptions}
             onSaved={loadDetail}
+            canEdit={canAddPrescription}
           />
-          <LabOrdersSection encounterId={id_!} labOrders={detail.labOrders} onSaved={loadDetail} />
+          <LabOrdersSection
+            encounterId={id_!}
+            labOrders={detail.labOrders}
+            onSaved={loadDetail}
+            canEdit={canAddLabOrder}
+          />
         </>
       )}
     </div>
@@ -100,10 +122,12 @@ function VitalsSection({
   encounterId,
   vitals,
   onSaved,
+  canEdit,
 }: {
   encounterId: string;
   vitals: EncounterDetail['vitals'];
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const [form, setForm] = useState({
     temperatureC: '',
@@ -116,10 +140,12 @@ function VitalsSection({
     heightCm: '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     const payload = Object.fromEntries(
       Object.entries(form)
         .filter(([, v]) => v !== '')
@@ -128,6 +154,8 @@ function VitalsSection({
     try {
       await apiClient.post(`/encounters/${encounterId}/vitals`, payload);
       onSaved();
+    } catch {
+      setError('Could not save vitals — try again.');
     } finally {
       setSaving(false);
     }
@@ -145,19 +173,27 @@ function VitalsSection({
           </li>
         ))}
       </ul>
-      <form className="inline-form" onSubmit={submit}>
-        <input placeholder="Temp °C" value={form.temperatureC} onChange={(e) => setForm({ ...form, temperatureC: e.target.value })} />
-        <input placeholder="BP sys" value={form.bloodPressureSys} onChange={(e) => setForm({ ...form, bloodPressureSys: e.target.value })} />
-        <input placeholder="BP dia" value={form.bloodPressureDia} onChange={(e) => setForm({ ...form, bloodPressureDia: e.target.value })} />
-        <input placeholder="Pulse" value={form.pulseBpm} onChange={(e) => setForm({ ...form, pulseBpm: e.target.value })} />
-        <input placeholder="RR" value={form.respiratoryRate} onChange={(e) => setForm({ ...form, respiratoryRate: e.target.value })} />
-        <input placeholder="SpO2 %" value={form.spo2Percent} onChange={(e) => setForm({ ...form, spo2Percent: e.target.value })} />
-        <input placeholder="Weight kg" value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} />
-        <input placeholder="Height cm" value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
-        <button type="submit" disabled={saving}>
-          Add vitals
-        </button>
-      </form>
+      {vitals.length === 0 && !canEdit && <p className="empty-state">No vitals recorded.</p>}
+      {canEdit ? (
+        <>
+          {error && <div className="error-banner">{error}</div>}
+          <form className="inline-form" onSubmit={submit}>
+            <input placeholder="Temp °C" value={form.temperatureC} onChange={(e) => setForm({ ...form, temperatureC: e.target.value })} />
+            <input placeholder="BP sys" value={form.bloodPressureSys} onChange={(e) => setForm({ ...form, bloodPressureSys: e.target.value })} />
+            <input placeholder="BP dia" value={form.bloodPressureDia} onChange={(e) => setForm({ ...form, bloodPressureDia: e.target.value })} />
+            <input placeholder="Pulse" value={form.pulseBpm} onChange={(e) => setForm({ ...form, pulseBpm: e.target.value })} />
+            <input placeholder="RR" value={form.respiratoryRate} onChange={(e) => setForm({ ...form, respiratoryRate: e.target.value })} />
+            <input placeholder="SpO2 %" value={form.spo2Percent} onChange={(e) => setForm({ ...form, spo2Percent: e.target.value })} />
+            <input placeholder="Weight kg" value={form.weightKg} onChange={(e) => setForm({ ...form, weightKg: e.target.value })} />
+            <input placeholder="Height cm" value={form.heightCm} onChange={(e) => setForm({ ...form, heightCm: e.target.value })} />
+            <button type="submit" disabled={saving}>
+              Add vitals
+            </button>
+          </form>
+        </>
+      ) : (
+        <p className="hint">Only doctors and nurses can record vitals.</p>
+      )}
     </section>
   );
 }
@@ -166,23 +202,29 @@ function DiagnosesSection({
   encounterId,
   diagnoses,
   onSaved,
+  canEdit,
 }: {
   encounterId: string;
   diagnoses: EncounterDetail['diagnoses'];
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const [icd10Code, setIcd10Code] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     try {
       await apiClient.post(`/encounters/${encounterId}/diagnoses`, { icd10Code, description });
       setIcd10Code('');
       setDescription('');
       onSaved();
+    } catch {
+      setError('Could not save diagnosis — try again.');
     } finally {
       setSaving(false);
     }
@@ -203,13 +245,21 @@ function DiagnosesSection({
           </li>
         ))}
       </ul>
-      <form className="inline-form" onSubmit={submit}>
-        <input placeholder="ICD-10 code" value={icd10Code} onChange={(e) => setIcd10Code(e.target.value)} required />
-        <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} required />
-        <button type="submit" disabled={saving}>
-          Add diagnosis
-        </button>
-      </form>
+      {diagnoses.length === 0 && !canEdit && <p className="empty-state">No diagnoses recorded.</p>}
+      {canEdit ? (
+        <>
+          {error && <div className="error-banner">{error}</div>}
+          <form className="inline-form" onSubmit={submit}>
+            <input placeholder="ICD-10 code" value={icd10Code} onChange={(e) => setIcd10Code(e.target.value)} required />
+            <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            <button type="submit" disabled={saving}>
+              Add diagnosis
+            </button>
+          </form>
+        </>
+      ) : (
+        <p className="hint">Only doctors can record diagnoses.</p>
+      )}
     </section>
   );
 }
@@ -218,10 +268,12 @@ function PrescriptionsSection({
   encounterId,
   prescriptions,
   onSaved,
+  canEdit,
 }: {
   encounterId: string;
   prescriptions: EncounterDetail['prescriptions'];
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const [form, setForm] = useState({
     medicationName: '',
@@ -231,10 +283,12 @@ function PrescriptionsSection({
     route: '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     try {
       await apiClient.post(`/encounters/${encounterId}/prescriptions`, {
         ...form,
@@ -242,6 +296,8 @@ function PrescriptionsSection({
       });
       setForm({ medicationName: '', dosage: '', frequency: '', durationDays: '', route: '' });
       onSaved();
+    } catch {
+      setError('Could not save prescription — try again.');
     } finally {
       setSaving(false);
     }
@@ -258,16 +314,26 @@ function PrescriptionsSection({
           </li>
         ))}
       </ul>
-      <form className="inline-form" onSubmit={submit}>
-        <input placeholder="Medication" value={form.medicationName} onChange={(e) => setForm({ ...form, medicationName: e.target.value })} required />
-        <input placeholder="Dosage" value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} required />
-        <input placeholder="Frequency" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} required />
-        <input placeholder="Duration (days)" value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} required />
-        <input placeholder="Route" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} required />
-        <button type="submit" disabled={saving}>
-          Add prescription
-        </button>
-      </form>
+      {prescriptions.length === 0 && !canEdit && (
+        <p className="empty-state">No prescriptions recorded.</p>
+      )}
+      {canEdit ? (
+        <>
+          {error && <div className="error-banner">{error}</div>}
+          <form className="inline-form" onSubmit={submit}>
+            <input placeholder="Medication" value={form.medicationName} onChange={(e) => setForm({ ...form, medicationName: e.target.value })} required />
+            <input placeholder="Dosage" value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} required />
+            <input placeholder="Frequency" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} required />
+            <input placeholder="Duration (days)" value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} required />
+            <input placeholder="Route" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} required />
+            <button type="submit" disabled={saving}>
+              Add prescription
+            </button>
+          </form>
+        </>
+      ) : (
+        <p className="hint">Only doctors can write prescriptions.</p>
+      )}
     </section>
   );
 }
@@ -276,21 +342,27 @@ function LabOrdersSection({
   encounterId,
   labOrders,
   onSaved,
+  canEdit,
 }: {
   encounterId: string;
   labOrders: EncounterDetail['labOrders'];
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const [testName, setTestName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     try {
       await apiClient.post(`/encounters/${encounterId}/lab-orders`, { testName });
       setTestName('');
       onSaved();
+    } catch {
+      setError('Could not order test — try again.');
     } finally {
       setSaving(false);
     }
@@ -313,12 +385,20 @@ function LabOrdersSection({
           </li>
         ))}
       </ul>
-      <form className="inline-form" onSubmit={submit}>
-        <input placeholder="Test name" value={testName} onChange={(e) => setTestName(e.target.value)} required />
-        <button type="submit" disabled={saving}>
-          Order test
-        </button>
-      </form>
+      {labOrders.length === 0 && !canEdit && <p className="empty-state">No lab orders yet.</p>}
+      {canEdit ? (
+        <>
+          {error && <div className="error-banner">{error}</div>}
+          <form className="inline-form" onSubmit={submit}>
+            <input placeholder="Test name" value={testName} onChange={(e) => setTestName(e.target.value)} required />
+            <button type="submit" disabled={saving}>
+              Order test
+            </button>
+          </form>
+        </>
+      ) : (
+        <p className="hint">Only doctors can order lab tests.</p>
+      )}
     </section>
   );
 }
