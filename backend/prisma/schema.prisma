@@ -391,6 +391,7 @@ model LabResult {
   unit           String?
   referenceRange String?
   flagged        Boolean @default(false)
+  notes          String?
 
   resultedById String
   resultedBy   User   @relation(fields: [resultedById], references: [id])

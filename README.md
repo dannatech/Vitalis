@@ -80,7 +80,10 @@ App runs on `http://localhost:5173`.
   super admin's role can only be changed by another super admin)
 - Patient registration (MRN, NIN, NHIS number, demographics, next of kin)
 - Encounters/visits, vital signs, diagnoses (ICD-10), prescriptions, lab orders & results
-- Facility-wide lab worklist (`/labs`): every lab order/result across patients in one view
+- Facility-wide lab worklist (`/labs`): every lab order/result across patients in one view;
+  lab techs enter results (value, unit, reference range, flagged, and a free-text note)
+  directly from the worklist, visible to the ordering doctor on the encounter as soon
+  as it's saved
 - NDPR consent capture and data-subject access/erasure requests
 - Append-only audit logging of all access to patient data
 - NCDC notifiable-disease flagging for reportable diagnoses

@@ -6,4 +6,8 @@ export class CreateLabResultDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() unit?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() referenceRange?: string;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() flagged?: boolean;
+  @ApiProperty({ required: false, description: 'Free-text context for the ordering doctor' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

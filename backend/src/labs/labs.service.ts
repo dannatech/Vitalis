@@ -43,6 +43,7 @@ export class LabsService {
             unit: order.result.unit,
             referenceRange: order.result.referenceRange,
             flagged: order.result.flagged,
+            notes: order.result.notes,
             resultedAt: order.result.resultedAt,
           }
         : null,

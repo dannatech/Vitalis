@@ -113,6 +113,7 @@ export interface LabOrder {
     unit: string | null;
     referenceRange: string | null;
     flagged: boolean;
+    notes: string | null;
   } | null;
 }
 
@@ -143,6 +144,7 @@ export interface LabWorklistEntry {
     unit: string | null;
     referenceRange: string | null;
     flagged: boolean;
+    notes: string | null;
     resultedAt: string;
   } | null;
 }

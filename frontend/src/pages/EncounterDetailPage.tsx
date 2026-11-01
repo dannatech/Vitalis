@@ -430,6 +430,7 @@ function LabOrdersSection({
                 {' '}
                 → {o.result.resultValue} {o.result.unit ?? ''}{' '}
                 {o.result.flagged && <span className="badge danger">Flagged</span>}
+                {o.result.notes && <div className="muted-inline">Lab note: {o.result.notes}</div>}
               </span>
             )}
           </li>
