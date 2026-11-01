@@ -26,7 +26,11 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
-      window.location.href = '/login';
+      // HashRouter under a subpath (see main.tsx/vite.config.ts): a bare
+      // '/login' 404s on GitHub Pages instead of reaching the login screen,
+      // which would strand the user somewhere they can't even log back in
+      // to trigger the outbox recovery in AuthContext.login.
+      window.location.href = `${import.meta.env.BASE_URL}#/login`;
     }
     return Promise.reject(error);
   },

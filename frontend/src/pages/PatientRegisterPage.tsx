@@ -42,6 +42,7 @@ export default function PatientRegisterPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!isDemo && !user) return;
     setSubmitting(true);
 
     const now = new Date().toISOString();
@@ -92,6 +93,7 @@ export default function PatientRegisterPage() {
       payload,
       status: 'pending',
       createdAt: now,
+      facilityId: user!.facilityId,
     });
 
     // Optimistic local cache entry so the patient is visible immediately,

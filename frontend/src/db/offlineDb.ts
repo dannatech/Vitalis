@@ -11,6 +11,10 @@ export interface OutboxPatient {
   status: OutboxStatus;
   error?: string;
   createdAt: string;
+  /** The facility of whoever was signed in when this was queued — lets a
+   *  fresh login flush only same-facility work before wiping (see
+   *  AuthContext.login) instead of attributing it to whoever logs in next. */
+  facilityId: string;
 }
 
 export interface OutboxEncounter {
@@ -19,6 +23,7 @@ export interface OutboxEncounter {
   status: OutboxStatus;
   error?: string;
   createdAt: string;
+  facilityId: string;
 }
 
 export interface MetaRow {

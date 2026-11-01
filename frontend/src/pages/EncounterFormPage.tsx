@@ -20,6 +20,7 @@ export default function EncounterFormPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!patientId) return;
+    if (!isDemo && !user) return;
     setSubmitting(true);
 
     const now = new Date().toISOString();
@@ -51,6 +52,7 @@ export default function EncounterFormPage() {
       payload: { patientId, type, chiefComplaint: chiefComplaint || undefined, clientGeneratedId },
       status: 'pending',
       createdAt: now,
+      facilityId: user!.facilityId,
     });
 
     const optimisticEncounter: Encounter = {

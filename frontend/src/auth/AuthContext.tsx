@@ -10,7 +10,7 @@ import {
 import apiClient, { AUTH_STORAGE_KEY } from '../api/client';
 import type { AuthUser } from '../api/types';
 import { clearAllLocalData } from '../db/offlineDb';
-import { startSyncEngine, stopSyncEngine } from '../sync/syncEngine';
+import { flushOutboxForFacility, startSyncEngine, stopSyncEngine } from '../sync/syncEngine';
 import { DEMO_FACILITY_ID, DEMO_MODE_STORAGE_KEY, seedDemoData } from '../demo/seedDemoData';
 
 interface StoredAuth {
@@ -44,7 +44,7 @@ interface AuthContextValue {
    * See src/demo/seedDemoData.ts.
    */
   loginDemo: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -69,9 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post<StoredAuth>('/auth/login', { email, password });
-    await clearAllLocalData();
     localStorage.removeItem(DEMO_FLAG_KEY);
+    // Store the fresh token before flushing: apiClient reads it from here,
+    // and this is what lets a record stuck from the *previous* session's
+    // expired token (see syncEngine.ts) actually reach the server before
+    // clearAllLocalData() below would otherwise delete it unsynced.
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
+    await flushOutboxForFacility(data.user.facilityId);
+    await clearAllLocalData();
     setUser(data.user);
     setIsDemo(false);
     startSyncEngine();
@@ -79,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const { data } = await apiClient.post<StoredAuth>('/auth/register', payload);
-    await clearAllLocalData();
     localStorage.removeItem(DEMO_FLAG_KEY);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
+    await flushOutboxForFacility(data.user.facilityId);
+    await clearAllLocalData();
     setUser(data.user);
     setIsDemo(false);
     startSyncEngine();
@@ -106,14 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsDemo(true);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Flush while the still-valid token is in place — removing it first
+    // (as below) would make any pending work unsendable before it's wiped.
+    if (user && !isDemo) {
+      await flushOutboxForFacility(user.facilityId);
+    }
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(DEMO_FLAG_KEY);
     setUser(null);
     setIsDemo(false);
     stopSyncEngine();
-    void clearAllLocalData();
-  }, []);
+    await clearAllLocalData();
+  }, [user, isDemo]);
 
   const value = useMemo(
     () => ({ user, isDemo, login, register, loginDemo, logout }),
