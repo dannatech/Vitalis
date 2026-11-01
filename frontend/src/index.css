@@ -235,6 +235,18 @@ button.secondary:hover {
   font-size: 0.85rem;
 }
 
+.inline-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.inline-edit .error-banner {
+  flex-basis: 100%;
+  margin-top: 0.4rem;
+}
+
 .hint {
   background: #fffbeb;
   color: var(--warning);

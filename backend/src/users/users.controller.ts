@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -28,5 +29,15 @@ export class UsersController {
   @Audit('STAFF_LIST', 'User')
   findAll(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.findAllForFacility(user);
+  }
+
+  @Patch(':id/role')
+  @Audit('STAFF_ROLE_UPDATE', 'User')
+  updateRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserRoleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.updateRole(id, dto, user);
   }
 }

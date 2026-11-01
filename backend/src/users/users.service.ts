@@ -1,9 +1,16 @@
-import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Role, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
 @Injectable()
 export class UsersService {
@@ -39,6 +46,38 @@ export class UsersService {
     });
 
     return this.toResponse(user);
+  }
+
+  /**
+   * Changes an existing staff member's role within the acting admin's own
+   * facility. Mirrors create()'s super-admin guard in both directions (can't
+   * grant it, can't touch an existing super admin's role unless you are one),
+   * and blocks self-edit so an admin can't accidentally lock themselves out.
+   */
+  async updateRole(targetId: string, dto: UpdateUserRoleDto, actor: AuthenticatedUser) {
+    if (targetId === actor.id) {
+      throw new BadRequestException('You cannot change your own role');
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id: targetId, facilityId: actor.facilityId },
+    });
+    if (!target) {
+      throw new NotFoundException('Staff account not found');
+    }
+
+    if (dto.role === Role.SUPER_ADMIN && actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Only a super admin can grant super admin access');
+    }
+    if (target.role === Role.SUPER_ADMIN && actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException("Only a super admin can change a super admin's role");
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetId },
+      data: { role: dto.role },
+    });
+    return this.toResponse(updated);
   }
 
   async findAllForFacility(actor: AuthenticatedUser) {

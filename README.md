@@ -75,7 +75,9 @@ App runs on `http://localhost:5173`.
 ## Core modules (MVP)
 
 - Facility management (multi-tenant: one deployment can serve multiple hospital sites)
-- Staff accounts with role-based access control (RBAC)
+- Staff accounts with role-based access control (RBAC); admins can edit an
+  existing staff member's role from the Staff page (not their own, and a
+  super admin's role can only be changed by another super admin)
 - Patient registration (MRN, NIN, NHIS number, demographics, next of kin)
 - Encounters/visits, vital signs, diagnoses (ICD-10), prescriptions, lab orders & results
 - Facility-wide lab worklist (`/labs`): every lab order/result across patients in one view

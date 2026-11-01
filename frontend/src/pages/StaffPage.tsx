@@ -34,6 +34,11 @@ export default function StaffPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState<Role>('DOCTOR');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   const loadStaff = useCallback(async () => {
     if (!isAdmin) return;
     try {
@@ -77,6 +82,43 @@ export default function StaffPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // Mirrors the backend's UsersService.updateRole guards: an admin can't
+  // edit their own role, and only a super admin can touch a super admin's.
+  function canEditRole(member: StaffMember): boolean {
+    if (!user || member.id === user.id) return false;
+    if (member.role === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN') return false;
+    return true;
+  }
+
+  function startEdit(member: StaffMember) {
+    setEditingId(member.id);
+    setEditRole(member.role);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError(null);
+  }
+
+  async function saveEdit(memberId: string) {
+    setEditSubmitting(true);
+    setEditError(null);
+    try {
+      await apiClient.patch(`/users/${memberId}/role`, { role: editRole });
+      setEditingId(null);
+      await loadStaff();
+    } catch (err) {
+      setEditError(
+        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
+          ? err.response.data.message
+          : 'Could not update the role — check the details and try again.',
+      );
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -176,28 +218,67 @@ export default function StaffPage() {
             <th>Email</th>
             <th>License</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          {staff.map((member) => (
-            <tr key={member.id}>
-              <td>{member.fullName}</td>
-              <td>{ROLE_OPTIONS.find((r) => r.value === member.role)?.label ?? member.role}</td>
-              <td>{member.email}</td>
-              <td>
-                {member.licenseNumber
-                  ? `${member.licenseNumber}${member.licenseBody ? ` (${member.licenseBody})` : ''}`
-                  : '—'}
-              </td>
-              <td>
-                {member.isActive ? (
-                  'Active'
-                ) : (
-                  <span className="badge warning">Inactive</span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {staff.map((member) => {
+            const isEditing = editingId === member.id;
+            return (
+              <tr key={member.id}>
+                <td>{member.fullName}</td>
+                <td>
+                  {isEditing ? (
+                    <div className="inline-edit">
+                      <select
+                        value={editRole}
+                        onChange={(e) => setEditRole(e.target.value as Role)}
+                      >
+                        {ROLE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={editSubmitting}
+                        onClick={() => saveEdit(member.id)}
+                      >
+                        {editSubmitting ? 'Saving…' : 'Save'}
+                      </button>
+                      <button type="button" disabled={editSubmitting} onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                      {editError && <div className="error-banner">{editError}</div>}
+                    </div>
+                  ) : (
+                    ROLE_OPTIONS.find((r) => r.value === member.role)?.label ?? member.role
+                  )}
+                </td>
+                <td>{member.email}</td>
+                <td>
+                  {member.licenseNumber
+                    ? `${member.licenseNumber}${member.licenseBody ? ` (${member.licenseBody})` : ''}`
+                    : '—'}
+                </td>
+                <td>
+                  {member.isActive ? (
+                    'Active'
+                  ) : (
+                    <span className="badge warning">Inactive</span>
+                  )}
+                </td>
+                <td>
+                  {!isEditing && canEditRole(member) && (
+                    <button type="button" onClick={() => startEdit(member)}>
+                      Edit role
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {staff.length === 0 && <p className="empty-state">No staff accounts yet.</p>}
