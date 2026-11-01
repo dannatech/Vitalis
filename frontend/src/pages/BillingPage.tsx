@@ -62,7 +62,7 @@ export default function BillingPage() {
         <h1>Billing</h1>
       </div>
       <p className="subtitle">
-        Patient invoicing, payments, and NHIS/HMO claims for your facility.
+        Patient invoicing, payments, and insurance-scheme claims for your facility.
       </p>
 
       {isDemo ? (

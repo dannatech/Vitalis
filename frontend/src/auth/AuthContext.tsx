@@ -20,6 +20,7 @@ interface StoredAuth {
 
 export interface RegisterPayload {
   facilityName: string;
+  country: string;
   state: string;
   lga: string;
   address?: string;
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: 'Demo User',
       role: 'DOCTOR',
       facilityId: DEMO_FACILITY_ID,
+      facilityCountry: 'NG',
     };
     await seedDemoData();
     // Empty accessToken: the API client only attaches an Authorization

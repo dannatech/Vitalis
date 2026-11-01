@@ -58,6 +58,7 @@ describe('AuthService', () => {
         isActive: false,
         role: Role.DOCTOR,
         facilityId: 'f1',
+        facility: { country: 'NG' },
       });
 
       await expect(service.login('x@test.ng', 'CorrectPass123!')).rejects.toBeInstanceOf(
@@ -74,6 +75,7 @@ describe('AuthService', () => {
         isActive: true,
         role: Role.DOCTOR,
         facilityId: 'f1',
+        facility: { country: 'NG' },
       });
 
       await expect(service.login('x@test.ng', 'WrongPassword!')).rejects.toBeInstanceOf(
@@ -91,13 +93,19 @@ describe('AuthService', () => {
         isActive: true,
         role: Role.DOCTOR,
         facilityId: 'f1',
+        facility: { country: 'NG' },
       });
       prisma.user.update.mockResolvedValue({});
 
       const result = await service.login('x@test.ng', 'CorrectPass123!');
 
       expect(result.accessToken).toBe('signed.jwt.token');
-      expect(result.user).toMatchObject({ id: 'user-1', email: 'x@test.ng', role: Role.DOCTOR });
+      expect(result.user).toMatchObject({
+        id: 'user-1',
+        email: 'x@test.ng',
+        role: Role.DOCTOR,
+        facilityCountry: 'NG',
+      });
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'user-1' } }),
       );
@@ -111,6 +119,7 @@ describe('AuthService', () => {
       await expect(
         service.register({
           facilityName: 'Clinic',
+          country: 'NG',
           state: 'Lagos',
           lga: 'Ikeja',
           adminFullName: 'Admin',
@@ -129,7 +138,7 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       const tx: Tx = {
-        facility: { create: jest.fn().mockResolvedValue({ id: 'facility-1' }) },
+        facility: { create: jest.fn().mockResolvedValue({ id: 'facility-1', country: 'NG' }) },
         user: {
           create: jest.fn().mockResolvedValue({
             id: 'user-1',
@@ -144,6 +153,7 @@ describe('AuthService', () => {
 
       const result = await service.register({
         facilityName: 'Ikeja Clinic',
+        country: 'NG',
         state: 'Lagos',
         lga: 'Ikeja',
         adminFullName: 'New Admin',
@@ -153,7 +163,12 @@ describe('AuthService', () => {
 
       expect(tx.facility.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ name: 'Ikeja Clinic', state: 'Lagos', lga: 'Ikeja' }),
+          data: expect.objectContaining({
+            name: 'Ikeja Clinic',
+            country: 'NG',
+            state: 'Lagos',
+            lga: 'Ikeja',
+          }),
         }),
       );
       expect(tx.user.create).toHaveBeenCalledWith(
@@ -166,7 +181,12 @@ describe('AuthService', () => {
         }),
       );
       expect(result.accessToken).toBe('signed.jwt.token');
-      expect(result.user).toMatchObject({ id: 'user-1', role: Role.ADMIN, facilityId: 'facility-1' });
+      expect(result.user).toMatchObject({
+        id: 'user-1',
+        role: Role.ADMIN,
+        facilityId: 'facility-1',
+        facilityCountry: 'NG',
+      });
       expect(payersService.ensureSelfPayPayer).toHaveBeenCalledWith('facility-1');
     });
   });

@@ -16,7 +16,10 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { facility: { select: { country: true } } },
+    });
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -46,6 +49,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         facilityId: user.facilityId,
+        facilityCountry: user.facility.country,
       },
     };
   }
@@ -70,6 +74,7 @@ export class AuthService {
       const facility = await tx.facility.create({
         data: {
           name: dto.facilityName,
+          country: dto.country,
           state: dto.state,
           lga: dto.lga,
           address: dto.address,
@@ -77,7 +82,7 @@ export class AuthService {
         },
       });
 
-      return tx.user.create({
+      const createdUser = await tx.user.create({
         data: {
           facilityId: facility.id,
           email: dto.email,
@@ -86,6 +91,7 @@ export class AuthService {
           role: Role.ADMIN,
         },
       });
+      return { ...createdUser, facilityCountry: facility.country };
     });
 
     await this.payersService.ensureSelfPayPayer(user.facilityId);
@@ -105,6 +111,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         facilityId: user.facilityId,
+        facilityCountry: user.facilityCountry,
       },
     };
   }

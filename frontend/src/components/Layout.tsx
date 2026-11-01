@@ -107,9 +107,9 @@ export default function Layout() {
               <span className="sidebar-link-label">ICD-10 Reference</span>
             </NavLink>
             {canSeeNcdcReports && (
-              <NavLink to="/ncdc-reports" onClick={closeSidebar} title="NCDC Reports">
+              <NavLink to="/ncdc-reports" onClick={closeSidebar} title="Notifiable Disease Reports">
                 <NcdcIcon className="sidebar-link-icon" />
-                <span className="sidebar-link-label">NCDC Reports</span>
+                <span className="sidebar-link-label">Notifiable Diseases</span>
               </NavLink>
             )}
             {canSeePharmacy && (

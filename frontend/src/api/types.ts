@@ -14,6 +14,8 @@ export interface AuthUser {
   fullName: string;
   role: Role;
   facilityId: string;
+  /** ISO 3166-1 alpha-2 country code — see data/countries.ts. */
+  facilityCountry: string;
 }
 
 export interface StaffMember {

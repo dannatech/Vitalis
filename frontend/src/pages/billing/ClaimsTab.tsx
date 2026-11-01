@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+import { formatCurrency, getCountry } from '../../data/countries';
 import type { ClaimDetail, ClaimListEntry, ClaimStatus, Payer } from '../../api/types';
 
 function statusBadgeClass(status: ClaimStatus): string {
@@ -9,15 +11,14 @@ function statusBadgeClass(status: ClaimStatus): string {
   return 'badge warning';
 }
 
-function money(amount: number): string {
-  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-}
-
 interface Props {
   payers: Payer[];
 }
 
 export default function ClaimsTab({ payers }: Props) {
+  const { user } = useAuth();
+  const country = getCountry(user?.facilityCountry);
+  const money = (amount: number) => formatCurrency(amount, user?.facilityCountry);
   const [claims, setClaims] = useState<ClaimListEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -261,7 +262,7 @@ export default function ClaimsTab({ payers }: Props) {
               </label>
               {adjudicateStatus !== 'REJECTED' && (
                 <label>
-                  Approved amount (₦) *
+                  Approved amount ({country.currencySymbol}) *
                   <input
                     required
                     type="number"

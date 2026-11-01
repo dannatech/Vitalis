@@ -1,14 +1,22 @@
 import { FormEvent, useState } from 'react';
 import axios from 'axios';
 import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+import { formatCurrency, getCountry, type CountryConfig } from '../../data/countries';
 import type { Payer, PayerType, TariffCategory, TariffItem } from '../../api/types';
 
-const PAYER_TYPES: Array<{ value: PayerType; label: string }> = [
-  { value: 'SELF_PAY', label: 'Self-Pay' },
-  { value: 'NHIS', label: 'NHIS' },
-  { value: 'STATE_SCHEME', label: 'State Scheme' },
-  { value: 'PRIVATE_HMO', label: 'Private HMO' },
-];
+// The "NHIS" enum value is a fixed backend identifier (not renamed per
+// country — see backend/prisma/schema.prisma's PayerType), but the label
+// shown for it should read as whatever scheme a facility's own country
+// actually calls it.
+function payerTypes(country: CountryConfig): Array<{ value: PayerType; label: string }> {
+  return [
+    { value: 'SELF_PAY', label: 'Self-Pay' },
+    { value: 'NHIS', label: country.insuranceSchemeName },
+    { value: 'STATE_SCHEME', label: 'State Scheme' },
+    { value: 'PRIVATE_HMO', label: 'Private HMO' },
+  ];
+}
 
 const TARIFF_CATEGORIES: Array<{ value: TariffCategory; label: string }> = [
   { value: 'CONSULTATION', label: 'Consultation' },
@@ -18,10 +26,6 @@ const TARIFF_CATEGORIES: Array<{ value: TariffCategory; label: string }> = [
   { value: 'ADMISSION', label: 'Admission' },
   { value: 'OTHER', label: 'Other' },
 ];
-
-function money(amount: number): string {
-  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-}
 
 interface Props {
   payers: Payer[];
@@ -36,6 +40,9 @@ export default function SettingsTab({
   onPayersChanged,
   onTariffItemsChanged,
 }: Props) {
+  const { user } = useAuth();
+  const country = getCountry(user?.facilityCountry);
+  const money = (amount: number) => formatCurrency(amount, user?.facilityCountry);
   const [showPayerForm, setShowPayerForm] = useState(false);
   const [payerName, setPayerName] = useState('');
   const [payerType, setPayerType] = useState<PayerType>('PRIVATE_HMO');
@@ -123,7 +130,7 @@ export default function SettingsTab({
             <label>
               Type *
               <select value={payerType} onChange={(e) => setPayerType(e.target.value as PayerType)}>
-                {PAYER_TYPES.map((t) => (
+                {payerTypes(country).map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
@@ -159,7 +166,7 @@ export default function SettingsTab({
           {payers.map((p) => (
             <tr key={p.id}>
               <td>{p.name}</td>
-              <td>{PAYER_TYPES.find((t) => t.value === p.type)?.label ?? p.type}</td>
+              <td>{payerTypes(country).find((t) => t.value === p.type)?.label ?? p.type}</td>
               <td>{p.contactInfo ?? '—'}</td>
             </tr>
           ))}
@@ -197,7 +204,7 @@ export default function SettingsTab({
               </select>
             </label>
             <label>
-              Unit price (₦) *
+              Unit price ({country.currencySymbol}) *
               <input
                 required
                 type="number"

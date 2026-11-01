@@ -1,9 +1,14 @@
 # Vitalis
 
-An Electronic Health Record (EHR) system built for African hospitals, with a first-class
-compliance target of **Nigerian healthcare regulation**: the Nigeria Data Protection
-Regulation (NDPR/NDPA 2023), NHIS/NHIA guidelines, and NCDC notifiable disease (IDSR)
-reporting. Designed offline-first for facilities with unreliable connectivity.
+An Electronic Health Record (EHR) system built for African hospitals, with per-country
+compliance built in rather than bolted on: data protection law, national-insurance
+identifiers, and notifiable-disease (IDSR) reporting, each mapped to the facility's own
+country (see `backend/src/common/countries.ts` / `frontend/src/data/countries.ts`).
+**Nigeria is the fully-worked reference implementation** — the Nigeria Data Protection
+Regulation (NDPR/NDPA 2023), NHIS/NHIA guidelines, and NCDC notifiable-disease reporting —
+with Kenya, Ghana, and South Africa structurally supported (region/currency/ID labels and
+their own disease-surveillance authority name), ready to be filled in as thoroughly as
+Nigeria's. Designed offline-first for facilities with unreliable connectivity.
 
 See [`COMPLIANCE.md`](./COMPLIANCE.md) for how the regulatory requirements map to the code.
 
@@ -74,7 +79,13 @@ App runs on `http://localhost:5173`.
 
 ## Core modules (MVP)
 
-- Facility management (multi-tenant: one deployment can serve multiple hospital sites)
+- Facility management (multi-tenant: one deployment can serve multiple hospital sites),
+  each with its own country (`NG`/`KE`/`GH`/`ZA` today) driving currency, address-subdivision
+  labels, national-ID terminology, and which insurance scheme/health authority names show
+  up — see `common/countries.ts` on both sides. The bullets below describe the fully-worked
+  Nigeria reference implementation; other countries get correct labels/currency/formatting
+  everywhere today, with their own notifiable-disease list and compliance detail still to
+  be filled in the same way Nigeria's was.
 - Staff accounts with role-based access control (RBAC); admins can edit an
   existing staff member's role from the Staff page (not their own, and a
   super admin's role can only be changed by another super admin)
@@ -111,7 +122,10 @@ App runs on `http://localhost:5173`.
   diagnosis, medication, and a short notes excerpt. Sending is fire-and-forget
   (never blocks or fails closing the encounter) and is skipped silently if
   `TERMII_API_KEY`/`TERMII_SENDER_ID` aren't configured or the patient has no
-  phone number on file.
+  phone number on file. The phone number is formatted using the facility's own
+  country dial code, but Termii's send endpoint itself (`api.ng.termii.com`) is
+  Nigeria-specific — verify delivery coverage (or swap providers) before relying
+  on this for a non-Nigerian facility in production.
 - ICD-10 reference (`/icd10-reference`): a curated Sub-Saharan Africa clinical
   reference (not the full ICD-10 standard) — epidemic-prone/NCDC-notifiable
   disease, common tropical/parasitic conditions, maternal & child health, and

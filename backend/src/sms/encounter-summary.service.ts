@@ -27,7 +27,7 @@ export class EncounterSummaryService {
         select: {
           visitDate: true,
           notes: true,
-          facility: { select: { name: true } },
+          facility: { select: { name: true, country: true } },
           diagnoses: { select: { description: true } },
           prescriptions: { select: { medicationName: true } },
           patient: { select: { phoneEncrypted: true } },
@@ -37,7 +37,7 @@ export class EncounterSummaryService {
 
       const phone = this.encryption.decrypt(encounter.patient.phoneEncrypted);
       const message = buildEncounterSummaryMessage(encounter);
-      await this.sms.send(phone, message);
+      await this.sms.send(phone, message, encounter.facility.country);
     } catch (err) {
       this.logger.error(
         `Failed to send encounter-closed SMS summary for encounter ${encounterId}`,

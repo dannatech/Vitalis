@@ -8,12 +8,12 @@ const FEATURES = [
     body: "Register patients and document encounters with no internet connection. Everything queues locally and syncs automatically once you're back online — built for facilities with unreliable connectivity.",
   },
   {
-    title: 'NDPR-compliant from day one',
-    body: 'Consent capture, data-subject access/erasure requests, field-level encryption for sensitive identifiers, and an append-only audit log on every record touched.',
+    title: 'Built for local data protection law',
+    body: "Consent capture, data-subject access/erasure requests, field-level encryption for sensitive identifiers, and an append-only audit log — mapped to each country's own regulation (NDPR in Nigeria today, with more on the way).",
   },
   {
-    title: 'NCDC notifiable-disease alerts',
-    body: "Diagnoses matching Nigeria's IDSR priority disease list are automatically flagged, giving your facility an internal worklist for required reporting.",
+    title: 'Notifiable-disease alerts',
+    body: "Diagnoses matching each country's IDSR priority disease list are automatically flagged, giving your facility an internal worklist for required reporting to the local health authority.",
   },
   {
     title: 'Role-based access control',
@@ -24,8 +24,8 @@ const FEATURES = [
     body: 'Registration, vital signs, ICD-10 diagnoses, prescriptions, and lab orders & results, all tied to a single patient timeline.',
   },
   {
-    title: 'NHIS-ready identifiers',
-    body: 'Captures NIN and NHIS enrollee numbers alongside standard demographics, so claims and insurance workflows have what they need.',
+    title: 'National ID & insurance-ready identifiers',
+    body: "Captures each country's national ID and insurance-scheme enrollee numbers alongside standard demographics, so claims and insurance workflows have what they need.",
   },
 ];
 
@@ -62,9 +62,10 @@ export default function LandingPage() {
         <div className="landing-hero-content">
           <h1 className="landing-title">Electronic Health Records built for African hospitals</h1>
           <p className="landing-subtitle">
-            Vitalis is an offline-first EHR designed around Nigerian healthcare regulation —
-            NDPR data protection, NHIS-ready identifiers, and NCDC notifiable-disease reporting,
-            built in from day one rather than bolted on later.
+            Vitalis is an offline-first EHR built around African healthcare regulation — local
+            data protection law, national-ID and insurance-ready identifiers, and
+            notifiable-disease reporting tailored to each country, not bolted on later.
+            Nigeria, Kenya, Ghana, and South Africa today, with more on the way.
           </p>
           <div className="landing-cta-row">
             <Link to={primaryCtaTarget} className="button">
@@ -92,7 +93,9 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <p>
-          Open-source reference EHR for Nigerian healthcare regulation. See{' '}
+          Open-source reference EHR for African healthcare regulation — Nigeria is the
+          fully-worked reference implementation today, with Kenya, Ghana, and South Africa
+          structurally supported. See{' '}
           <a
             href="https://github.com/dannatech/Vitalis/blob/main/COMPLIANCE.md"
             target="_blank"

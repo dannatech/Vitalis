@@ -1,16 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { COUNTRY_CODES, type CountryCode } from '../../common/countries';
 
 export class RegisterDto {
   @ApiProperty({ description: 'New facility/hospital name' })
   @IsString()
   facilityName!: string;
 
-  @ApiProperty()
+  @ApiProperty({ enum: COUNTRY_CODES, description: 'ISO 3166-1 alpha-2 country code' })
+  @IsIn(COUNTRY_CODES)
+  country!: CountryCode;
+
+  @ApiProperty({ description: 'Top-level address subdivision — State/County/Region/Province' })
   @IsString()
   state!: string;
 
-  @ApiProperty({ description: 'Local Government Area' })
+  @ApiProperty({ description: 'Second-level address subdivision — LGA/Sub-county/District/Municipality' })
   @IsString()
   lga!: string;
 

@@ -23,7 +23,7 @@ export class SmsService {
 
   constructor(private readonly config: ConfigService) {}
 
-  async send(toPhone: string, message: string): Promise<void> {
+  async send(toPhone: string, message: string, countryCode?: string): Promise<void> {
     const apiKey = this.config.get<string>('TERMII_API_KEY');
     const senderId = this.config.get<string>('TERMII_SENDER_ID');
 
@@ -37,7 +37,7 @@ export class SmsService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: toTermiiFormat(toPhone),
+          to: toTermiiFormat(toPhone, countryCode),
           from: senderId,
           sms: message,
           type: 'plain',

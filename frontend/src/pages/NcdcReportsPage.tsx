@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { getCountry } from '../data/countries';
 import type { NcdcReportEntry } from '../api/types';
 
 type StatusFilter = '' | 'pending' | 'reported';
@@ -16,6 +17,7 @@ const VIEW_ROLES = ['DOCTOR', 'NURSE', 'RECORDS_OFFICER', 'ADMIN', 'SUPER_ADMIN'
 
 export default function NcdcReportsPage() {
   const { isDemo, user } = useAuth();
+  const country = getCountry(user?.facilityCountry);
   const canView = Boolean(user && VIEW_ROLES.includes(user.role));
   const canMarkReported =
     user?.role === 'RECORDS_OFFICER' || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -59,7 +61,7 @@ export default function NcdcReportsPage() {
   if (!canView) {
     return (
       <div>
-        <h1>NCDC Reports</h1>
+        <h1>Notifiable Disease Reports</h1>
         <p className="hint">
           This worklist isn't available for your role. It's visible to doctors, nurses, records
           officers, and admins.
@@ -71,10 +73,11 @@ export default function NcdcReportsPage() {
   return (
     <div>
       <div className="page-header">
-        <h1>NCDC Reports</h1>
+        <h1>Notifiable Disease Reports</h1>
       </div>
       <p className="subtitle">
-        Diagnoses flagged against Nigeria's IDSR notifiable disease list. See{' '}
+        Diagnoses flagged against the IDSR notifiable disease list, for reporting to{' '}
+        {country.healthAuthorityName}. See{' '}
         <a
           href="https://github.com/dannatech/Vitalis/blob/main/COMPLIANCE.md"
           target="_blank"
@@ -82,12 +85,12 @@ export default function NcdcReportsPage() {
         >
           COMPLIANCE.md §4
         </a>{' '}
-        — this is an internal worklist, not an automatic submission to NCDC.
+        — this is an internal worklist, not an automatic submission to {country.healthAuthorityName}.
       </p>
 
       {isDemo ? (
         <div className="hint">
-          Preview mode — the NCDC worklist needs a real backend, so it's not available here.
+          Preview mode — this worklist needs a real backend, so it's not available here.
         </div>
       ) : (
         <>

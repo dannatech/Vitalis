@@ -14,6 +14,10 @@ datasource db {
 model Facility {
   id               String   @id @default(uuid())
   name             String
+  /// ISO 3166-1 alpha-2 country code — see common/countries.ts for the
+  /// supported list and what each one drives (currency, region labels,
+  /// national-ID terminology, insurance scheme / health-authority names).
+  country          String   @default("NG")
   /// NHIA-assigned facility code, where applicable
   nhisFacilityCode String?
   state            String

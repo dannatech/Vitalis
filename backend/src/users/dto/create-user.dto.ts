@@ -20,7 +20,7 @@ export class CreateUserDto {
   @IsEnum(Role)
   role!: Role;
 
-  @ApiProperty({ required: false, description: 'License number for clinical roles (MDCN/NMCN/PCN/etc.)' })
+  @ApiProperty({ required: false, description: "License number for clinical roles, per the facility's country regulatory body" })
   @IsOptional()
   @IsString()
   licenseNumber?: string;

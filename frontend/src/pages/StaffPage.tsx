@@ -190,7 +190,7 @@ export default function StaffPage() {
               <input
                 value={form.licenseNumber}
                 onChange={(e) => update('licenseNumber', e.target.value)}
-                placeholder="e.g. MDCN/12345"
+                placeholder="e.g. your country's medical/nursing council number"
               />
             </label>
             <label>
@@ -198,7 +198,7 @@ export default function StaffPage() {
               <input
                 value={form.licenseBody}
                 onChange={(e) => update('licenseBody', e.target.value)}
-                placeholder="e.g. MDCN, NMCN, PCN"
+                placeholder="e.g. the licensing/regulatory council's name"
               />
             </label>
             <div className="span-2 actions">

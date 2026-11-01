@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import apiClient from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
+import { formatCurrency, getCountry } from '../../data/countries';
 import type {
   InvoiceDetail,
   InvoiceListEntry,
@@ -31,16 +33,15 @@ function statusBadgeClass(status: InvoiceStatus): string {
   return 'badge warning';
 }
 
-function money(amount: number): string {
-  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-}
-
 interface Props {
   payers: Payer[];
   tariffItems: TariffItem[];
 }
 
 export default function InvoicesTab({ payers, tariffItems }: Props) {
+  const { user } = useAuth();
+  const country = getCountry(user?.facilityCountry);
+  const money = (amount: number) => formatCurrency(amount, user?.facilityCountry);
   const [invoices, setInvoices] = useState<InvoiceListEntry[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -328,7 +329,7 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
                     />
                   </label>
                   <label>
-                    Unit price (₦)
+                    Unit price ({country.currencySymbol})
                     <input
                       type="number"
                       min={0}
@@ -385,7 +386,7 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
                 <h3>Record a payment</h3>
                 <form className="form-grid" onSubmit={handleRecordPayment}>
                   <label>
-                    Amount (₦) *
+                    Amount ({country.currencySymbol}) *
                     <input
                       required
                       type="number"

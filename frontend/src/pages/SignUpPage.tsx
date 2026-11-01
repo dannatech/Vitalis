@@ -3,7 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../auth/AuthContext';
 import Logo from '../components/Logo';
+import { COUNTRIES, DEFAULT_COUNTRY_CODE, getCountry, type CountryCode } from '../data/countries';
 
+// Only Nigeria gets a curated dropdown — that's the one country list we
+// actually have accurate data for. Every other supported country's region
+// fields are free text (same as LGA always has been) rather than guessing
+// at a list of counties/regions/provinces we can't verify.
 const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
   'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT (Abuja)', 'Gombe',
@@ -14,6 +19,7 @@ const NIGERIAN_STATES = [
 
 const emptyForm = {
   facilityName: '',
+  country: DEFAULT_COUNTRY_CODE as CountryCode,
   state: '',
   lga: '',
   address: '',
@@ -30,6 +36,7 @@ export default function SignUpPage() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const country = getCountry(form.country);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -52,6 +59,7 @@ export default function SignUpPage() {
     try {
       await register({
         facilityName: form.facilityName,
+        country: form.country,
         state: form.state,
         lga: form.lga,
         address: form.address || undefined,
@@ -93,22 +101,43 @@ export default function SignUpPage() {
             placeholder="e.g. Ikeja Community Clinic"
           />
         </label>
+        <label>
+          Country *
+          <select
+            required
+            value={form.country}
+            onChange={(e) => {
+              const next = e.target.value as CountryCode;
+              setForm((f) => ({ ...f, country: next, state: '' }));
+            }}
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="signup-row">
           <label>
-            State *
-            <select required value={form.state} onChange={(e) => update('state', e.target.value)}>
-              <option value="" disabled>
-                Select state
-              </option>
-              {NIGERIAN_STATES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+            {country.region1Label} *
+            {country.code === 'NG' ? (
+              <select required value={form.state} onChange={(e) => update('state', e.target.value)}>
+                <option value="" disabled>
+                  Select {country.region1Label.toLowerCase()}
                 </option>
-              ))}
-            </select>
+                {NIGERIAN_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input required value={form.state} onChange={(e) => update('state', e.target.value)} />
+            )}
           </label>
           <label>
-            LGA *
+            {country.region2Label} *
             <input required value={form.lga} onChange={(e) => update('lga', e.target.value)} />
           </label>
         </div>
