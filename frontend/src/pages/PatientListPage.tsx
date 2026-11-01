@@ -3,8 +3,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
 import { db } from '../db/offlineDb';
 import { runSync } from '../sync/syncEngine';
+import { useAuth } from '../auth/AuthContext';
+
+// Mirrors the backend's POST /patients RBAC.
+const REGISTER_ROLES = ['ADMIN', 'RECORDS_OFFICER', 'NURSE', 'DOCTOR'];
 
 export default function PatientListPage() {
+  const { user } = useAuth();
+  const canRegister = Boolean(user && REGISTER_ROLES.includes(user.role));
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -27,10 +33,17 @@ export default function PatientListPage() {
     <div>
       <div className="page-header">
         <h1>Patients</h1>
-        <Link className="button" to="/patients/register">
-          Register new patient
-        </Link>
+        {canRegister && (
+          <Link className="button" to="/patients/register">
+            Register new patient
+          </Link>
+        )}
       </div>
+      {!canRegister && (
+        <p className="hint">
+          Patient registration is handled by doctors, nurses, records officers, and admins.
+        </p>
+      )}
 
       <input
         className="search-input"

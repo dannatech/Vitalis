@@ -31,6 +31,9 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getStoredCollapsed);
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  // Mirrors the backend's GET /labs RBAC.
+  const canSeeLabs =
+    user && ['LAB_TECH', 'DOCTOR', 'NURSE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
   // Mirrors the backend's GET /ncdc-reports RBAC — pharmacy/lab/billing
   // roles have no clinical or compliance reason to see this worklist.
   const canSeeNcdcReports =
@@ -93,10 +96,12 @@ export default function Layout() {
               <PatientsIcon className="sidebar-link-icon" />
               <span className="sidebar-link-label">Patients</span>
             </NavLink>
-            <NavLink to="/labs" onClick={closeSidebar} title="Labs">
-              <LabsIcon className="sidebar-link-icon" />
-              <span className="sidebar-link-label">Labs</span>
-            </NavLink>
+            {canSeeLabs && (
+              <NavLink to="/labs" onClick={closeSidebar} title="Labs">
+                <LabsIcon className="sidebar-link-icon" />
+                <span className="sidebar-link-label">Labs</span>
+              </NavLink>
+            )}
             <NavLink to="/icd10-reference" onClick={closeSidebar} title="ICD-10 Reference">
               <ReferenceIcon className="sidebar-link-icon" />
               <span className="sidebar-link-label">ICD-10 Reference</span>

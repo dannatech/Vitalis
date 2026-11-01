@@ -12,15 +12,19 @@ const STATUS_OPTIONS: Array<{ value: LabOrderStatus | ''; label: string }> = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
+// Mirrors the backend's GET /labs RBAC.
+const VIEW_ROLES = ['LAB_TECH', 'DOCTOR', 'NURSE', 'ADMIN', 'SUPER_ADMIN'];
+
 export default function LabsPage() {
-  const { isDemo } = useAuth();
+  const { isDemo, user } = useAuth();
+  const canView = Boolean(user && VIEW_ROLES.includes(user.role));
   const [orders, setOrders] = useState<LabWorklistEntry[]>([]);
   const [status, setStatus] = useState<LabOrderStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || !canView) return;
     setLoading(true);
     apiClient
       .get<LabWorklistEntry[]>('/labs', { params: status ? { status } : {} })
@@ -30,7 +34,19 @@ export default function LabsPage() {
       })
       .catch(() => setError('Could not load lab orders — check connectivity.'))
       .finally(() => setLoading(false));
-  }, [status, isDemo]);
+  }, [status, isDemo, canView]);
+
+  if (!canView) {
+    return (
+      <div>
+        <h1>Labs</h1>
+        <p className="hint">
+          This worklist isn't available for your role. It's visible to lab techs, doctors,
+          nurses, and admins.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

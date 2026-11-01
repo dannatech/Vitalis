@@ -6,6 +6,9 @@ import { runSync } from '../sync/syncEngine';
 import { useAuth } from '../auth/AuthContext';
 import BackButton from '../components/BackButton';
 
+// Mirrors the backend's POST /patients RBAC.
+const REGISTER_ROLES = ['ADMIN', 'RECORDS_OFFICER', 'NURSE', 'DOCTOR'];
+
 const emptyForm = {
   mrn: '',
   nin: '',
@@ -28,7 +31,8 @@ const emptyForm = {
 
 export default function PatientRegisterPage() {
   const navigate = useNavigate();
-  const { isDemo } = useAuth();
+  const { isDemo, user } = useAuth();
+  const canRegister = Boolean(isDemo || (user && REGISTER_ROLES.includes(user.role)));
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,6 +106,18 @@ export default function PatientRegisterPage() {
 
     void runSync();
     navigate(`/patients/${optimisticPatient.id}`);
+  }
+
+  if (!canRegister) {
+    return (
+      <div>
+        <BackButton fallback="/patients" />
+        <h1>Register patient</h1>
+        <p className="hint">
+          Patient registration is handled by doctors, nurses, records officers, and admins.
+        </p>
+      </div>
+    );
   }
 
   return (
