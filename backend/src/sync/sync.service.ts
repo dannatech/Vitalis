@@ -78,7 +78,122 @@ export class SyncService {
       }
     }
 
-    return { patients: patientResults, encounters: encounterResults };
+    const vitalsResults: PushResult[] = [];
+    for (const vitalsDto of dto.vitals ?? []) {
+      if (!vitalsDto.clientGeneratedId) {
+        vitalsResults.push({
+          clientGeneratedId: '',
+          status: 'error',
+          error: 'clientGeneratedId is required for offline sync',
+        });
+        continue;
+      }
+      try {
+        const { encounterId, ...rest } = vitalsDto;
+        const vitals = await this.encountersService.addVitals(encounterId, rest, actor);
+        vitalsResults.push({
+          clientGeneratedId: vitalsDto.clientGeneratedId,
+          serverId: vitals.id,
+          status: 'ok',
+        });
+      } catch (err) {
+        vitalsResults.push({
+          clientGeneratedId: vitalsDto.clientGeneratedId,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    const diagnosisResults: PushResult[] = [];
+    for (const diagnosisDto of dto.diagnoses ?? []) {
+      if (!diagnosisDto.clientGeneratedId) {
+        diagnosisResults.push({
+          clientGeneratedId: '',
+          status: 'error',
+          error: 'clientGeneratedId is required for offline sync',
+        });
+        continue;
+      }
+      try {
+        const { encounterId, ...rest } = diagnosisDto;
+        const diagnosis = await this.encountersService.addDiagnosis(encounterId, rest, actor);
+        diagnosisResults.push({
+          clientGeneratedId: diagnosisDto.clientGeneratedId,
+          serverId: diagnosis.id,
+          status: 'ok',
+        });
+      } catch (err) {
+        diagnosisResults.push({
+          clientGeneratedId: diagnosisDto.clientGeneratedId,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    const prescriptionResults: PushResult[] = [];
+    for (const prescriptionDto of dto.prescriptions ?? []) {
+      if (!prescriptionDto.clientGeneratedId) {
+        prescriptionResults.push({
+          clientGeneratedId: '',
+          status: 'error',
+          error: 'clientGeneratedId is required for offline sync',
+        });
+        continue;
+      }
+      try {
+        const { encounterId, ...rest } = prescriptionDto;
+        const prescription = await this.encountersService.addPrescription(encounterId, rest, actor);
+        prescriptionResults.push({
+          clientGeneratedId: prescriptionDto.clientGeneratedId,
+          serverId: prescription.id,
+          status: 'ok',
+        });
+      } catch (err) {
+        prescriptionResults.push({
+          clientGeneratedId: prescriptionDto.clientGeneratedId,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    const labOrderResults: PushResult[] = [];
+    for (const labOrderDto of dto.labOrders ?? []) {
+      if (!labOrderDto.clientGeneratedId) {
+        labOrderResults.push({
+          clientGeneratedId: '',
+          status: 'error',
+          error: 'clientGeneratedId is required for offline sync',
+        });
+        continue;
+      }
+      try {
+        const { encounterId, ...rest } = labOrderDto;
+        const labOrder = await this.encountersService.addLabOrder(encounterId, rest, actor);
+        labOrderResults.push({
+          clientGeneratedId: labOrderDto.clientGeneratedId,
+          serverId: labOrder.id,
+          status: 'ok',
+        });
+      } catch (err) {
+        labOrderResults.push({
+          clientGeneratedId: labOrderDto.clientGeneratedId,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      patients: patientResults,
+      encounters: encounterResults,
+      vitals: vitalsResults,
+      diagnoses: diagnosisResults,
+      prescriptions: prescriptionResults,
+      labOrders: labOrderResults,
+    };
   }
 
   /**
@@ -96,7 +211,16 @@ export class SyncService {
       }),
       this.prisma.encounter.findMany({
         where: { facilityId: actor.facilityId, updatedAt: { gt: sinceDate } },
-        include: { vitals: true, diagnoses: true, prescriptions: true, labOrders: true },
+        // Matches EncountersService.findOne()'s include depth — the
+        // frontend now reads clinical detail from this pulled cache
+        // instead of a separate live GET, so a shallower include here
+        // would silently drop the NCDC badge and lab result fields.
+        include: {
+          vitals: true,
+          diagnoses: { include: { notifiableDisease: true } },
+          prescriptions: true,
+          labOrders: { include: { result: true } },
+        },
       }),
     ]);
 

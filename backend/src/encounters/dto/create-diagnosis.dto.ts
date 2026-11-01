@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateDiagnosisDto {
   @ApiProperty()
@@ -9,4 +9,9 @@ export class CreateDiagnosisDto {
   @ApiProperty()
   @IsString()
   description!: string;
+
+  @ApiProperty({ required: false, description: 'Offline-client idempotency key' })
+  @IsOptional()
+  @IsString()
+  clientGeneratedId?: string;
 }

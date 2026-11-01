@@ -278,6 +278,8 @@ model VitalSigns {
   weightKg         Float?
   heightCm         Float?
 
+  clientGeneratedId String? @unique
+
   recordedById String
   recordedBy   User   @relation(fields: [recordedById], references: [id])
   recordedAt   DateTime @default(now())
@@ -304,6 +306,8 @@ model Diagnosis {
 
   icd10Code   String
   description String
+
+  clientGeneratedId String? @unique
 
   notifiableDiseaseId String?
   notifiableDisease    NotifiableDisease? @relation(fields: [notifiableDiseaseId], references: [id])
@@ -345,6 +349,8 @@ model Prescription {
   durationDays   Int
   route          String
 
+  clientGeneratedId String? @unique
+
   prescribedById String
   prescribedBy   User   @relation("PrescriptionPrescriber", fields: [prescribedById], references: [id])
 
@@ -372,6 +378,8 @@ model LabOrder {
 
   testName String
   status   LabOrderStatus @default(ORDERED)
+
+  clientGeneratedId String? @unique
 
   orderedById String
   orderedBy   User   @relation(fields: [orderedById], references: [id])

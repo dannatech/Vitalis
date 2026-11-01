@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsNumber } from 'class-validator';
+import { IsInt, IsOptional, IsNumber, IsString } from 'class-validator';
 
 export class CreateVitalsDto {
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() temperatureC?: number;
@@ -10,4 +10,8 @@ export class CreateVitalsDto {
   @ApiProperty({ required: false }) @IsOptional() @IsInt() spo2Percent?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() weightKg?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() heightCm?: number;
+  @ApiProperty({ required: false, description: 'Offline-client idempotency key' })
+  @IsOptional()
+  @IsString()
+  clientGeneratedId?: string;
 }

@@ -75,9 +75,19 @@ export class EncountersService {
 
   async addVitals(encounterId: string, dto: CreateVitalsDto, actor: AuthenticatedUser) {
     await this.assertEncounterInFacility(encounterId, actor);
-    return this.prisma.vitalSigns.create({
-      data: { encounterId, ...dto, recordedById: actor.id },
-    });
+    if (dto.clientGeneratedId) {
+      const existing = await this.prisma.vitalSigns.findUnique({
+        where: { clientGeneratedId: dto.clientGeneratedId },
+      });
+      if (existing) return existing;
+    }
+    const [vitals] = await this.prisma.$transaction([
+      this.prisma.vitalSigns.create({ data: { encounterId, ...dto, recordedById: actor.id } }),
+      // Bump the parent so the incremental pull sync (GET /sync/pull?since=)
+      // picks this up — it only re-fetches encounters whose updatedAt moved.
+      this.prisma.encounter.update({ where: { id: encounterId }, data: { updatedAt: new Date() } }),
+    ]);
+    return vitals;
   }
 
   /**
@@ -88,31 +98,46 @@ export class EncountersService {
   async addDiagnosis(encounterId: string, dto: CreateDiagnosisDto, actor: AuthenticatedUser) {
     const encounter = await this.assertEncounterInFacility(encounterId, actor);
 
+    if (dto.clientGeneratedId) {
+      const existing = await this.prisma.diagnosis.findUnique({
+        where: { clientGeneratedId: dto.clientGeneratedId },
+      });
+      if (existing) return existing;
+    }
+
     const notifiableDisease = await this.prisma.notifiableDisease.findUnique({
       where: { icd10Code: dto.icd10Code },
     });
 
-    const diagnosis = await this.prisma.diagnosis.create({
-      data: {
-        encounterId,
-        icd10Code: dto.icd10Code,
-        description: dto.description,
-        notedById: actor.id,
-        notifiableDiseaseId: notifiableDisease?.id,
-      },
-    });
-
-    if (notifiableDisease) {
-      await this.prisma.notifiableDiseaseReport.create({
+    return this.prisma.$transaction(async (tx) => {
+      const diagnosis = await tx.diagnosis.create({
         data: {
-          diagnosisId: diagnosis.id,
-          patientId: encounter.patientId,
-          facilityId: encounter.facilityId,
+          encounterId,
+          icd10Code: dto.icd10Code,
+          description: dto.description,
+          clientGeneratedId: dto.clientGeneratedId,
+          notedById: actor.id,
+          notifiableDiseaseId: notifiableDisease?.id,
         },
       });
-    }
 
-    return diagnosis;
+      await tx.encounter.update({
+        where: { id: encounterId },
+        data: { updatedAt: new Date() },
+      });
+
+      if (notifiableDisease) {
+        await tx.notifiableDiseaseReport.create({
+          data: {
+            diagnosisId: diagnosis.id,
+            patientId: encounter.patientId,
+            facilityId: encounter.facilityId,
+          },
+        });
+      }
+
+      return diagnosis;
+    });
   }
 
   async addPrescription(
@@ -121,16 +146,39 @@ export class EncountersService {
     actor: AuthenticatedUser,
   ) {
     await this.assertEncounterInFacility(encounterId, actor);
-    return this.prisma.prescription.create({
-      data: { encounterId, ...dto, prescribedById: actor.id },
-    });
+    if (dto.clientGeneratedId) {
+      const existing = await this.prisma.prescription.findUnique({
+        where: { clientGeneratedId: dto.clientGeneratedId },
+      });
+      if (existing) return existing;
+    }
+    const [prescription] = await this.prisma.$transaction([
+      this.prisma.prescription.create({ data: { encounterId, ...dto, prescribedById: actor.id } }),
+      this.prisma.encounter.update({ where: { id: encounterId }, data: { updatedAt: new Date() } }),
+    ]);
+    return prescription;
   }
 
   async addLabOrder(encounterId: string, dto: CreateLabOrderDto, actor: AuthenticatedUser) {
     await this.assertEncounterInFacility(encounterId, actor);
-    return this.prisma.labOrder.create({
-      data: { encounterId, testName: dto.testName, orderedById: actor.id },
-    });
+    if (dto.clientGeneratedId) {
+      const existing = await this.prisma.labOrder.findUnique({
+        where: { clientGeneratedId: dto.clientGeneratedId },
+      });
+      if (existing) return existing;
+    }
+    const [labOrder] = await this.prisma.$transaction([
+      this.prisma.labOrder.create({
+        data: {
+          encounterId,
+          testName: dto.testName,
+          clientGeneratedId: dto.clientGeneratedId,
+          orderedById: actor.id,
+        },
+      }),
+      this.prisma.encounter.update({ where: { id: encounterId }, data: { updatedAt: new Date() } }),
+    ]);
+    return labOrder;
   }
 
   async addLabResult(labOrderId: string, dto: CreateLabResultDto, actor: AuthenticatedUser) {
@@ -146,6 +194,13 @@ export class EncountersService {
       this.prisma.labOrder.update({
         where: { id: labOrderId },
         data: { status: 'RESULTED' },
+      }),
+      // Same reason as the add* methods above: the doctor's view now reads
+      // from the pull-synced cache, which only re-fetches encounters whose
+      // updatedAt moved — without this a result would never show up there.
+      this.prisma.encounter.update({
+        where: { id: order.encounterId },
+        data: { updatedAt: new Date() },
       }),
     ]);
     return result;

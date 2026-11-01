@@ -94,11 +94,17 @@ App runs on `http://localhost:5173`.
   mark paid, with CSV export) — there's no standardized electronic claims
   submission API across Nigerian payers, so this produces the bundle and
   export a billing officer submits manually per payer's own process
-- Offline-first sync: the frontend queues writes locally and syncs when back online.
-  A failed push (dropped connection, expired session) retries on the next cycle
-  instead of silently stalling, and signing back in after a session expires
-  flushes any still-queued work to the server before the local cache resets —
-  an offline registration never gets wiped unsynced just because the device
+- Offline-first sync: the frontend queues writes locally and syncs when back online —
+  patient registration, starting an encounter, and all four clinical-documentation
+  forms within it (vitals, diagnoses, prescriptions, lab orders) all work with no
+  connectivity, including charting a brand-new encounter end-to-end before it has
+  ever reached the server. Dependent records (an encounter's patient, a vital
+  sign's encounter, etc.) resolve to their real server id automatically once the
+  parent syncs, in the correct order, even if the whole chain was created offline
+  in one sitting. A failed push (dropped connection, expired session) retries on
+  the next cycle instead of silently stalling, and signing back in after a session
+  expires flushes any still-queued work to the server before the local cache
+  resets — an offline record never gets wiped unsynced just because the device
   stayed offline long enough for the login session to expire.
 - SMS visit summaries: when a doctor closes an encounter, the patient gets an SMS
   (via [Termii](https://termii.com)) summarising the visit — facility, date,

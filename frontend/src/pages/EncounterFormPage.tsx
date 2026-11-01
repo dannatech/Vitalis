@@ -47,6 +47,9 @@ export default function EncounterFormPage() {
     }
 
     const clientGeneratedId = newClientId();
+    // payload.patientId may still be a "local-…" placeholder if the
+    // referenced patient hasn't synced yet — syncEngine.ts resolves it to a
+    // real id at flush time (or skips this row until that patient syncs).
     await db.outboxEncounters.put({
       clientGeneratedId,
       payload: { patientId, type, chiefComplaint: chiefComplaint || undefined, clientGeneratedId },

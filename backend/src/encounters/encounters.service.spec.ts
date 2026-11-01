@@ -24,10 +24,12 @@ describe('EncountersService', () => {
   let prisma: {
     encounter: { findFirst: jest.Mock; update: jest.Mock };
     notifiableDisease: { findUnique: jest.Mock };
-    diagnosis: { create: jest.Mock };
+    diagnosis: { create: jest.Mock; findUnique: jest.Mock };
     notifiableDiseaseReport: { create: jest.Mock };
-    labOrder: { findFirst: jest.Mock; update: jest.Mock };
+    labOrder: { findFirst: jest.Mock; update: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
     labResult: { create: jest.Mock };
+    vitalSigns: { create: jest.Mock; findUnique: jest.Mock };
+    prescription: { create: jest.Mock; findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let encounterSummary: { notifyEncounterClosed: jest.Mock };
@@ -36,12 +38,21 @@ describe('EncountersService', () => {
     prisma = {
       encounter: { findFirst: jest.fn(), update: jest.fn() },
       notifiableDisease: { findUnique: jest.fn() },
-      diagnosis: { create: jest.fn() },
+      diagnosis: { create: jest.fn(), findUnique: jest.fn() },
       notifiableDiseaseReport: { create: jest.fn() },
-      labOrder: { findFirst: jest.fn(), update: jest.fn() },
+      labOrder: { findFirst: jest.fn(), update: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
       labResult: { create: jest.fn() },
-      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      vitalSigns: { create: jest.fn(), findUnique: jest.fn() },
+      prescription: { create: jest.fn(), findUnique: jest.fn() },
+      $transaction: jest.fn(),
     };
+    // Supports both $transaction forms used by EncountersService: the array
+    // form (independent writes) and the interactive callback form (addDiagnosis,
+    // which needs the just-created diagnosis's id for the notifiable-disease
+    // report) — the callback just gets the same mock back as `tx`.
+    prisma.$transaction.mockImplementation((arg: unknown) =>
+      typeof arg === 'function' ? arg(prisma) : Promise.all(arg as Promise<unknown>[]),
+    );
     encounterSummary = { notifyEncounterClosed: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
@@ -132,11 +143,113 @@ describe('EncountersService', () => {
 
       expect(prisma.diagnosis.create).not.toHaveBeenCalled();
     });
+
+    it('dedupes a retried push by clientGeneratedId', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.diagnosis.findUnique.mockResolvedValue({ id: 'diagnosis-1', clientGeneratedId: 'cd-1' });
+
+      const result = await service.addDiagnosis(
+        'encounter-1',
+        { icd10Code: 'A00', description: 'x', clientGeneratedId: 'cd-1' },
+        ACTOR,
+      );
+
+      expect(result).toEqual({ id: 'diagnosis-1', clientGeneratedId: 'cd-1' });
+      expect(prisma.diagnosis.create).not.toHaveBeenCalled();
+      expect(prisma.notifiableDisease.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addVitals', () => {
+    it('creates vitals and bumps the parent encounter so pull sync picks it up', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.vitalSigns.create.mockResolvedValue({ id: 'vitals-1', encounterId: 'encounter-1' });
+
+      await service.addVitals('encounter-1', { temperatureC: 37.2, clientGeneratedId: 'cv-1' }, ACTOR);
+
+      expect(prisma.vitalSigns.create).toHaveBeenCalledWith({
+        data: { encounterId: 'encounter-1', temperatureC: 37.2, clientGeneratedId: 'cv-1', recordedById: 'doctor-1' },
+      });
+      expect(prisma.encounter.update).toHaveBeenCalledWith({
+        where: { id: 'encounter-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+    });
+
+    it('returns the existing row instead of creating a duplicate on a retried push', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.vitalSigns.findUnique.mockResolvedValue({ id: 'vitals-1', clientGeneratedId: 'cv-1' });
+
+      const result = await service.addVitals('encounter-1', { clientGeneratedId: 'cv-1' }, ACTOR);
+
+      expect(result).toEqual({ id: 'vitals-1', clientGeneratedId: 'cv-1' });
+      expect(prisma.vitalSigns.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addPrescription', () => {
+    it('creates a prescription and bumps the parent encounter', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.prescription.create.mockResolvedValue({ id: 'rx-1' });
+
+      await service.addPrescription(
+        'encounter-1',
+        { medicationName: 'Amoxicillin', dosage: '500mg', frequency: 'TDS', durationDays: 5, route: 'Oral' },
+        ACTOR,
+      );
+
+      expect(prisma.encounter.update).toHaveBeenCalledWith({
+        where: { id: 'encounter-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+    });
+
+    it('dedupes a retried push by clientGeneratedId', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.prescription.findUnique.mockResolvedValue({ id: 'rx-1', clientGeneratedId: 'cp-1' });
+
+      const result = await service.addPrescription(
+        'encounter-1',
+        { medicationName: 'x', dosage: 'x', frequency: 'x', durationDays: 1, route: 'x', clientGeneratedId: 'cp-1' },
+        ACTOR,
+      );
+
+      expect(result).toEqual({ id: 'rx-1', clientGeneratedId: 'cp-1' });
+      expect(prisma.prescription.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addLabOrder', () => {
+    it('creates a lab order and bumps the parent encounter', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.labOrder.create.mockResolvedValue({ id: 'lo-1' });
+
+      await service.addLabOrder('encounter-1', { testName: 'FBC' }, ACTOR);
+
+      expect(prisma.encounter.update).toHaveBeenCalledWith({
+        where: { id: 'encounter-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+    });
+
+    it('dedupes a retried push by clientGeneratedId', async () => {
+      prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
+      prisma.labOrder.findUnique.mockResolvedValue({ id: 'lo-1', clientGeneratedId: 'cl-1' });
+
+      const result = await service.addLabOrder(
+        'encounter-1',
+        { testName: 'FBC', clientGeneratedId: 'cl-1' },
+        ACTOR,
+      );
+
+      expect(result).toEqual({ id: 'lo-1', clientGeneratedId: 'cl-1' });
+      expect(prisma.labOrder.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('addLabResult', () => {
     it('records the result and marks the order RESULTED in the same transaction', async () => {
-      prisma.labOrder.findFirst.mockResolvedValue({ id: 'order-1' });
+      prisma.labOrder.findFirst.mockResolvedValue({ id: 'order-1', encounterId: 'encounter-1' });
       prisma.labResult.create.mockResolvedValue({ id: 'result-1', resultValue: '14.2' });
       prisma.labOrder.update.mockResolvedValue({ id: 'order-1', status: 'RESULTED' });
 
@@ -146,6 +259,10 @@ describe('EncountersService', () => {
       expect(prisma.labOrder.update).toHaveBeenCalledWith({
         where: { id: 'order-1' },
         data: { status: 'RESULTED' },
+      });
+      expect(prisma.encounter.update).toHaveBeenCalledWith({
+        where: { id: 'encounter-1' },
+        data: { updatedAt: expect.any(Date) },
       });
     });
 

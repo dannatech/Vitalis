@@ -56,27 +56,13 @@ export interface Patient {
 export type EncounterType = 'OUTPATIENT' | 'INPATIENT' | 'EMERGENCY' | 'ANTENATAL';
 export type EncounterStatus = 'OPEN' | 'CLOSED';
 
-export interface Encounter {
-  id: string;
-  facilityId: string;
-  patientId: string;
-  clinicianId: string;
-  type: EncounterType;
-  status: EncounterStatus;
-  visitDate: string;
-  chiefComplaint: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  clientGeneratedId?: string | null;
-}
-
 export interface Diagnosis {
   id: string;
   encounterId: string;
   icd10Code: string;
   description: string;
   notifiableDisease?: { name: string; reportingTimeframe: string } | null;
+  clientGeneratedId?: string | null;
 }
 
 export interface VitalSigns {
@@ -90,6 +76,7 @@ export interface VitalSigns {
   spo2Percent?: number | null;
   weightKg?: number | null;
   heightCm?: number | null;
+  clientGeneratedId?: string | null;
 }
 
 export interface Prescription {
@@ -101,6 +88,7 @@ export interface Prescription {
   durationDays: number;
   route: string;
   dispensed: boolean;
+  clientGeneratedId?: string | null;
 }
 
 export interface LabOrder {
@@ -108,6 +96,7 @@ export interface LabOrder {
   encounterId: string;
   testName: string;
   status: 'ORDERED' | 'COLLECTED' | 'RESULTED' | 'CANCELLED';
+  clientGeneratedId?: string | null;
   result?: {
     resultValue: string;
     unit: string | null;
@@ -117,11 +106,26 @@ export interface LabOrder {
   } | null;
 }
 
-export interface EncounterDetail extends Encounter {
-  vitals: VitalSigns[];
-  diagnoses: Diagnosis[];
-  prescriptions: Prescription[];
-  labOrders: LabOrder[];
+export interface Encounter {
+  id: string;
+  facilityId: string;
+  patientId: string;
+  clinicianId: string;
+  type: EncounterType;
+  status: EncounterStatus;
+  visitDate: string;
+  chiefComplaint: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  clientGeneratedId?: string | null;
+  // Populated by GET /sync/pull (it fetches encounters with these relations
+  // included) — undefined on an encounter that only exists locally and
+  // hasn't synced yet, or hasn't been pulled since these were added.
+  vitals?: VitalSigns[];
+  diagnoses?: Diagnosis[];
+  prescriptions?: Prescription[];
+  labOrders?: LabOrder[];
 }
 
 export type LabOrderStatus = 'ORDERED' | 'COLLECTED' | 'RESULTED' | 'CANCELLED';

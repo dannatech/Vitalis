@@ -1,12 +1,43 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { clientIdFromLocalId, db } from '../db/offlineDb';
-import apiClient from '../api/client';
-import type { EncounterDetail } from '../api/types';
+import { clientIdFromLocalId, db, newClientId } from '../db/offlineDb';
+import type { OutboxDependentRecord } from '../db/offlineDb';
+import type { Diagnosis, Encounter, LabOrder, Prescription, VitalSigns } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { runSync } from '../sync/syncEngine';
 import BackButton from '../components/BackButton';
 import { searchIcd10, type Icd10Entry } from '../data/icd10Reference';
+
+/** True when a queued outbox row (still carrying whatever encounter id was
+ *  current when it was written — possibly a stale "local-…" one) belongs to
+ *  the encounter currently on screen, which may since have synced to a new
+ *  real id. Matches either directly, or via the encounter's stable
+ *  clientGeneratedId. */
+function belongsToEncounter(payloadEncounterId: unknown, encounter: Encounter): boolean {
+  if (payloadEncounterId === encounter.id) return true;
+  if (
+    typeof payloadEncounterId === 'string' &&
+    payloadEncounterId.startsWith('local-') &&
+    encounter.clientGeneratedId
+  ) {
+    return clientIdFromLocalId(payloadEncounterId) === encounter.clientGeneratedId;
+  }
+  return false;
+}
+
+function usePendingForEncounter(
+  table: typeof db.outboxVitals,
+  encounter: Encounter | undefined,
+): OutboxDependentRecord[] {
+  return (
+    useLiveQuery(async () => {
+      if (!encounter) return [];
+      const all = await table.toArray();
+      return all.filter((row) => belongsToEncounter(row.payload.encounterId, encounter));
+    }, [encounter?.id, encounter?.clientGeneratedId]) ?? []
+  );
+}
 
 export default function EncounterDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,25 +72,12 @@ export default function EncounterDetailPage() {
   const id_ = encounter?.id ?? id;
   const isUnsynced = id_?.startsWith('local-') ?? false;
 
-  const [detail, setDetail] = useState<EncounterDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadDetail = useCallback(async () => {
-    // Demo-mode encounters only ever exist in the local cache, never on a
-    // real backend — fetching clinical detail for one would just 404/fail.
-    if (!id_ || isUnsynced || isDemo) return;
-    try {
-      const { data } = await apiClient.get<EncounterDetail>(`/encounters/${id_}`);
-      setDetail(data);
-      setError(null);
-    } catch {
-      setError('Could not load clinical detail — check connectivity.');
-    }
-  }, [id_, isUnsynced, isDemo]);
-
+  // Best-effort background refresh so clinical detail stays current — the
+  // sections below render straight from the Dexie cache (populated by
+  // GET /sync/pull), so this is a freshen, not a prerequisite for display.
   useEffect(() => {
-    void loadDetail();
-  }, [loadDetail]);
+    if (!isDemo) void runSync();
+  }, [isDemo]);
 
   if (!encounter) return <p>Loading…</p>;
 
@@ -71,65 +89,37 @@ export default function EncounterDetailPage() {
         {encounter.type} · {encounter.status}
       </p>
 
-      {isUnsynced && (
-        <div className="hint">
-          This encounter hasn't synced to the server yet. Vitals, diagnoses, prescriptions and
-          lab orders can be added once it syncs (automatic when back online).
-        </div>
-      )}
-
-      {!isUnsynced && isDemo && (
+      {isDemo && (
         <div className="hint">
           Preview mode — vitals, diagnoses, prescriptions and lab orders need a real backend, so
           they're not available for this sample encounter.
         </div>
       )}
 
-      {!isUnsynced && !isDemo && error && <div className="error-banner">{error}</div>}
-
-      {!isUnsynced && !isDemo && detail && (
+      {!isDemo && (
         <>
-          <VitalsSection
-            encounterId={id_!}
-            vitals={detail.vitals}
-            onSaved={loadDetail}
-            canEdit={canAddVitals}
-          />
-          <DiagnosesSection
-            encounterId={id_!}
-            diagnoses={detail.diagnoses}
-            onSaved={loadDetail}
-            canEdit={canAddDiagnosis}
-          />
-          <PrescriptionsSection
-            encounterId={id_!}
-            prescriptions={detail.prescriptions}
-            onSaved={loadDetail}
-            canEdit={canAddPrescription}
-          />
-          <LabOrdersSection
-            encounterId={id_!}
-            labOrders={detail.labOrders}
-            onSaved={loadDetail}
-            canEdit={canAddLabOrder}
-          />
+          <VitalsSection encounter={encounter} canEdit={canAddVitals} />
+          <DiagnosesSection encounter={encounter} canEdit={canAddDiagnosis} />
+          <PrescriptionsSection encounter={encounter} canEdit={canAddPrescription} />
+          <LabOrdersSection encounter={encounter} canEdit={canAddLabOrder} />
         </>
+      )}
+
+      {!isDemo && isUnsynced && (
+        <p className="muted-inline">
+          This encounter hasn't synced to the server yet — anything added above will sync along
+          with it, automatically, once you're back online.
+        </p>
       )}
     </div>
   );
 }
 
-function VitalsSection({
-  encounterId,
-  vitals,
-  onSaved,
-  canEdit,
-}: {
-  encounterId: string;
-  vitals: EncounterDetail['vitals'];
-  onSaved: () => void;
-  canEdit: boolean;
-}) {
+function VitalsSection({ encounter, canEdit }: { encounter: Encounter; canEdit: boolean }) {
+  const { user } = useAuth();
+  const synced = encounter.vitals ?? [];
+  const pending = usePendingForEncounter(db.outboxVitals, encounter);
+
   const [form, setForm] = useState({
     temperatureC: '',
     bloodPressureSys: '',
@@ -145,18 +135,36 @@ function VitalsSection({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
-    const payload = Object.fromEntries(
+    const numericFields = Object.fromEntries(
       Object.entries(form)
         .filter(([, v]) => v !== '')
         .map(([k, v]) => [k, Number(v)]),
     );
     try {
-      await apiClient.post(`/encounters/${encounterId}/vitals`, payload);
-      onSaved();
+      const clientGeneratedId = newClientId();
+      await db.outboxVitals.put({
+        clientGeneratedId,
+        payload: { encounterId: encounter.id, ...numericFields, clientGeneratedId },
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        facilityId: user.facilityId,
+      });
+      setForm({
+        temperatureC: '',
+        bloodPressureSys: '',
+        bloodPressureDia: '',
+        pulseBpm: '',
+        respiratoryRate: '',
+        spo2Percent: '',
+        weightKg: '',
+        heightCm: '',
+      });
+      void runSync();
     } catch {
-      setError('Could not save vitals — try again.');
+      setError('Could not queue vitals — try again.');
     } finally {
       setSaving(false);
     }
@@ -166,15 +174,30 @@ function VitalsSection({
     <section className="card">
       <h2>Vital signs</h2>
       <ul>
-        {vitals.map((v) => (
+        {synced.map((v: VitalSigns) => (
           <li key={v.id}>
             T {v.temperatureC ?? '—'}°C · BP {v.bloodPressureSys ?? '—'}/{v.bloodPressureDia ?? '—'}{' '}
             · Pulse {v.pulseBpm ?? '—'} bpm · SpO₂ {v.spo2Percent ?? '—'}% · RR{' '}
             {v.respiratoryRate ?? '—'} · Wt {v.weightKg ?? '—'}kg · Ht {v.heightCm ?? '—'}cm
           </li>
         ))}
+        {pending.map((row) => {
+          const p = row.payload as Record<string, number | undefined>;
+          return (
+            <li key={row.clientGeneratedId}>
+              T {p.temperatureC ?? '—'}°C · BP {p.bloodPressureSys ?? '—'}/{p.bloodPressureDia ?? '—'}{' '}
+              · Pulse {p.pulseBpm ?? '—'} bpm · SpO₂ {p.spo2Percent ?? '—'}% · RR{' '}
+              {p.respiratoryRate ?? '—'} · Wt {p.weightKg ?? '—'}kg · Ht {p.heightCm ?? '—'}cm{' '}
+              <span className="badge warning">
+                {row.status === 'error' ? 'Sync failed, will retry' : 'Pending sync'}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      {vitals.length === 0 && !canEdit && <p className="empty-state">No vitals recorded.</p>}
+      {synced.length === 0 && pending.length === 0 && !canEdit && (
+        <p className="empty-state">No vitals recorded.</p>
+      )}
       {canEdit ? (
         <>
           {error && <div className="error-banner">{error}</div>}
@@ -199,17 +222,11 @@ function VitalsSection({
   );
 }
 
-function DiagnosesSection({
-  encounterId,
-  diagnoses,
-  onSaved,
-  canEdit,
-}: {
-  encounterId: string;
-  diagnoses: EncounterDetail['diagnoses'];
-  onSaved: () => void;
-  canEdit: boolean;
-}) {
+function DiagnosesSection({ encounter, canEdit }: { encounter: Encounter; canEdit: boolean }) {
+  const { user } = useAuth();
+  const synced = encounter.diagnoses ?? [];
+  const pending = usePendingForEncounter(db.outboxDiagnoses, encounter);
+
   const [icd10Code, setIcd10Code] = useState('');
   const [description, setDescription] = useState('');
   const [search, setSearch] = useState('');
@@ -228,16 +245,24 @@ function DiagnosesSection({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
     try {
-      await apiClient.post(`/encounters/${encounterId}/diagnoses`, { icd10Code, description });
+      const clientGeneratedId = newClientId();
+      await db.outboxDiagnoses.put({
+        clientGeneratedId,
+        payload: { encounterId: encounter.id, icd10Code, description, clientGeneratedId },
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        facilityId: user.facilityId,
+      });
       setIcd10Code('');
       setDescription('');
       setSearch('');
-      onSaved();
+      void runSync();
     } catch {
-      setError('Could not save diagnosis — try again.');
+      setError('Could not queue diagnosis — try again.');
     } finally {
       setSaving(false);
     }
@@ -247,7 +272,7 @@ function DiagnosesSection({
     <section className="card">
       <h2>Diagnoses</h2>
       <ul>
-        {diagnoses.map((d) => (
+        {synced.map((d: Diagnosis) => (
           <li key={d.id}>
             <strong>{d.icd10Code}</strong> — {d.description}
             {d.notifiableDisease && (
@@ -257,8 +282,21 @@ function DiagnosesSection({
             )}
           </li>
         ))}
+        {pending.map((row) => {
+          const p = row.payload as Record<string, string | undefined>;
+          return (
+            <li key={row.clientGeneratedId}>
+              <strong>{p.icd10Code}</strong> — {p.description}{' '}
+              <span className="badge warning">
+                {row.status === 'error' ? 'Sync failed, will retry' : 'Pending sync'}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      {diagnoses.length === 0 && !canEdit && <p className="empty-state">No diagnoses recorded.</p>}
+      {synced.length === 0 && pending.length === 0 && !canEdit && (
+        <p className="empty-state">No diagnoses recorded.</p>
+      )}
       {canEdit ? (
         <>
           {error && <div className="error-banner">{error}</div>}
@@ -314,17 +352,11 @@ function DiagnosesSection({
   );
 }
 
-function PrescriptionsSection({
-  encounterId,
-  prescriptions,
-  onSaved,
-  canEdit,
-}: {
-  encounterId: string;
-  prescriptions: EncounterDetail['prescriptions'];
-  onSaved: () => void;
-  canEdit: boolean;
-}) {
+function PrescriptionsSection({ encounter, canEdit }: { encounter: Encounter; canEdit: boolean }) {
+  const { user } = useAuth();
+  const synced = encounter.prescriptions ?? [];
+  const pending = usePendingForEncounter(db.outboxPrescriptions, encounter);
+
   const [form, setForm] = useState({
     medicationName: '',
     dosage: '',
@@ -337,17 +369,27 @@ function PrescriptionsSection({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
     try {
-      await apiClient.post(`/encounters/${encounterId}/prescriptions`, {
-        ...form,
-        durationDays: Number(form.durationDays),
+      const clientGeneratedId = newClientId();
+      await db.outboxPrescriptions.put({
+        clientGeneratedId,
+        payload: {
+          encounterId: encounter.id,
+          ...form,
+          durationDays: Number(form.durationDays),
+          clientGeneratedId,
+        },
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        facilityId: user.facilityId,
       });
       setForm({ medicationName: '', dosage: '', frequency: '', durationDays: '', route: '' });
-      onSaved();
+      void runSync();
     } catch {
-      setError('Could not save prescription — try again.');
+      setError('Could not queue prescription — try again.');
     } finally {
       setSaving(false);
     }
@@ -357,14 +399,25 @@ function PrescriptionsSection({
     <section className="card">
       <h2>Prescriptions</h2>
       <ul>
-        {prescriptions.map((p) => (
+        {synced.map((p: Prescription) => (
           <li key={p.id}>
             {p.medicationName} — {p.dosage}, {p.frequency}, {p.durationDays}d, {p.route}
             {p.dispensed && <span className="badge">Dispensed</span>}
           </li>
         ))}
+        {pending.map((row) => {
+          const p = row.payload as Record<string, string | number | undefined>;
+          return (
+            <li key={row.clientGeneratedId}>
+              {p.medicationName} — {p.dosage}, {p.frequency}, {p.durationDays}d, {p.route}{' '}
+              <span className="badge warning">
+                {row.status === 'error' ? 'Sync failed, will retry' : 'Pending sync'}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      {prescriptions.length === 0 && !canEdit && (
+      {synced.length === 0 && pending.length === 0 && !canEdit && (
         <p className="empty-state">No prescriptions recorded.</p>
       )}
       {canEdit ? (
@@ -388,31 +441,33 @@ function PrescriptionsSection({
   );
 }
 
-function LabOrdersSection({
-  encounterId,
-  labOrders,
-  onSaved,
-  canEdit,
-}: {
-  encounterId: string;
-  labOrders: EncounterDetail['labOrders'];
-  onSaved: () => void;
-  canEdit: boolean;
-}) {
+function LabOrdersSection({ encounter, canEdit }: { encounter: Encounter; canEdit: boolean }) {
+  const { user } = useAuth();
+  const synced = encounter.labOrders ?? [];
+  const pending = usePendingForEncounter(db.outboxLabOrders, encounter);
+
   const [testName, setTestName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
     setError(null);
     try {
-      await apiClient.post(`/encounters/${encounterId}/lab-orders`, { testName });
+      const clientGeneratedId = newClientId();
+      await db.outboxLabOrders.put({
+        clientGeneratedId,
+        payload: { encounterId: encounter.id, testName, clientGeneratedId },
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        facilityId: user.facilityId,
+      });
       setTestName('');
-      onSaved();
+      void runSync();
     } catch {
-      setError('Could not order test — try again.');
+      setError('Could not queue the lab order — try again.');
     } finally {
       setSaving(false);
     }
@@ -422,7 +477,7 @@ function LabOrdersSection({
     <section className="card">
       <h2>Lab orders</h2>
       <ul>
-        {labOrders.map((o) => (
+        {synced.map((o: LabOrder) => (
           <li key={o.id}>
             {o.testName} — {o.status}
             {o.result && (
@@ -435,8 +490,21 @@ function LabOrdersSection({
             )}
           </li>
         ))}
+        {pending.map((row) => {
+          const p = row.payload as Record<string, string | undefined>;
+          return (
+            <li key={row.clientGeneratedId}>
+              {p.testName}{' '}
+              <span className="badge warning">
+                {row.status === 'error' ? 'Sync failed, will retry' : 'Pending sync'}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      {labOrders.length === 0 && !canEdit && <p className="empty-state">No lab orders yet.</p>}
+      {synced.length === 0 && pending.length === 0 && !canEdit && (
+        <p className="empty-state">No lab orders yet.</p>
+      )}
       {canEdit ? (
         <>
           {error && <div className="error-banner">{error}</div>}

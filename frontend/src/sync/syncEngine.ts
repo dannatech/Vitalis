@@ -1,5 +1,7 @@
+import type { Table } from 'dexie';
 import apiClient from '../api/client';
-import { db, localId } from '../db/offlineDb';
+import { clientIdFromLocalId, db, localId, resolveSyncedId } from '../db/offlineDb';
+import type { OutboxDependentRecord } from '../db/offlineDb';
 import type { Encounter, Patient } from '../api/types';
 import { isAuthenticated, isDemoMode } from './sessionFlags';
 
@@ -19,6 +21,8 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
+type PushResult = { clientGeneratedId: string; serverId?: string; status: 'ok' | 'error'; error?: string };
+
 async function flushPatients(facilityId?: string) {
   const all = await db.outboxPatients.where('status').anyOf('pending', 'error').toArray();
   const pending = all.filter((p) => !facilityId || p.facilityId === facilityId);
@@ -26,7 +30,7 @@ async function flushPatients(facilityId?: string) {
 
   await db.outboxPatients.bulkPut(pending.map((p) => ({ ...p, status: 'syncing' as const })));
 
-  let data: { patients: Array<{ clientGeneratedId: string; serverId?: string; status: 'ok' | 'error'; error?: string }> };
+  let data: { patients: PushResult[] };
   try {
     ({ data } = await apiClient.post('/sync/push', {
       patients: pending.map((p) => p.payload),
@@ -40,9 +44,17 @@ async function flushPatients(facilityId?: string) {
   }
 
   for (const result of data.patients) {
-    if (result.status === 'ok') {
-      await db.outboxPatients.delete(result.clientGeneratedId);
+    if (result.status === 'ok' && result.serverId) {
+      // Promote the optimistic local-… row to the real id instead of just
+      // deleting it — a same-cycle flushEncounters() needs to resolve this
+      // patient's real id immediately after, without waiting for the next
+      // pull() to bring the canonical row down.
+      const localRow = await db.patients.get(localId(result.clientGeneratedId));
+      if (localRow) {
+        await db.patients.put({ ...localRow, id: result.serverId });
+      }
       await db.patients.delete(localId(result.clientGeneratedId));
+      await db.outboxPatients.delete(result.clientGeneratedId);
     } else {
       await db.outboxPatients.update(result.clientGeneratedId, {
         status: 'error',
@@ -52,32 +64,111 @@ async function flushPatients(facilityId?: string) {
   }
 }
 
+/** Resolves payload[parentKey] to a real id if it's still a "local-…"
+ *  placeholder, by looking up the parent's clientGeneratedId (recoverable
+ *  straight from the placeholder itself, see localId.ts) in parentTable.
+ *  Returns null — meaning "not ready, leave this row queued" — when the
+ *  parent hasn't synced yet. Returns the payload unchanged when the
+ *  reference was already a real id. */
+async function resolveParentReference<T extends { id: string; clientGeneratedId?: string | null }>(
+  payload: Record<string, unknown>,
+  parentKey: string,
+  parentTable: Table<T, string>,
+): Promise<Record<string, unknown> | null> {
+  const parentId = payload[parentKey] as string | undefined;
+  if (!parentId || !parentId.startsWith('local-')) return payload;
+  const clientGeneratedId = clientIdFromLocalId(parentId);
+  if (!clientGeneratedId) return payload;
+  const resolved = await resolveSyncedId(parentTable, clientGeneratedId);
+  if (!resolved) return null;
+  return { ...payload, [parentKey]: resolved };
+}
+
 async function flushEncounters(facilityId?: string) {
   const all = await db.outboxEncounters.where('status').anyOf('pending', 'error').toArray();
-  const pending = all.filter((e) => !facilityId || e.facilityId === facilityId);
-  if (pending.length === 0) return;
+  const scoped = all.filter((e) => !facilityId || e.facilityId === facilityId);
+  if (scoped.length === 0) return;
 
-  await db.outboxEncounters.bulkPut(pending.map((e) => ({ ...e, status: 'syncing' as const })));
+  const ready: Array<{ row: typeof scoped[number]; payload: Record<string, unknown> }> = [];
+  for (const row of scoped) {
+    const payload = await resolveParentReference(row.payload, 'patientId', db.patients);
+    if (payload) ready.push({ row, payload });
+    // else: the referenced patient hasn't synced yet — leave this row
+    // queued as-is, it'll resolve on a later cycle once the patient does.
+  }
+  if (ready.length === 0) return;
 
-  let data: { encounters: Array<{ clientGeneratedId: string; serverId?: string; status: 'ok' | 'error'; error?: string }> };
+  await db.outboxEncounters.bulkPut(ready.map(({ row }) => ({ ...row, status: 'syncing' as const })));
+
+  let data: { encounters: PushResult[] };
   try {
     ({ data } = await apiClient.post('/sync/push', {
-      encounters: pending.map((e) => e.payload),
+      encounters: ready.map((r) => r.payload),
     }));
   } catch (err) {
-    await db.outboxEncounters.bulkPut(pending.map((e) => ({ ...e, status: 'pending' as const })));
+    await db.outboxEncounters.bulkPut(ready.map(({ row }) => ({ ...row, status: 'pending' as const })));
     throw err;
   }
 
   for (const result of data.encounters) {
-    if (result.status === 'ok') {
-      await db.outboxEncounters.delete(result.clientGeneratedId);
+    if (result.status === 'ok' && result.serverId) {
+      // Same reason as flushPatients: promote instead of just deleting, so
+      // a same-cycle flush of vitals/diagnoses/prescriptions/lab orders can
+      // resolve this encounter's real id right away.
+      const localRow = await db.encounters.get(localId(result.clientGeneratedId));
+      if (localRow) {
+        await db.encounters.put({ ...localRow, id: result.serverId });
+      }
       await db.encounters.delete(localId(result.clientGeneratedId));
+      await db.outboxEncounters.delete(result.clientGeneratedId);
     } else {
       await db.outboxEncounters.update(result.clientGeneratedId, {
         status: 'error',
         error: result.error,
       });
+    }
+  }
+}
+
+/** Shared flush for the four clinical-record outbox tables (vitals,
+ *  diagnoses, prescriptions, lab orders). Each entry's payload.encounterId
+ *  is resolved against db.encounters the same way flushEncounters resolves
+ *  patientId — a row whose encounter hasn't synced yet is simply skipped
+ *  this cycle, not marked syncing or failed. Unlike patients/encounters,
+ *  these have no separate optimistic cache row to promote/delete: the
+ *  outbox entry itself is what the UI shows as "pending" (merged with the
+ *  synced detail.* arrays on the encounter), so a success just deletes it. */
+async function flushClinicalRecords(
+  table: Table<OutboxDependentRecord, string>,
+  pushKey: 'vitals' | 'diagnoses' | 'prescriptions' | 'labOrders',
+  facilityId?: string,
+) {
+  const all = await table.where('status').anyOf('pending', 'error').toArray();
+  const scoped = all.filter((r) => !facilityId || r.facilityId === facilityId);
+  if (scoped.length === 0) return;
+
+  const ready: Array<{ row: (typeof scoped)[number]; payload: Record<string, unknown> }> = [];
+  for (const row of scoped) {
+    const payload = await resolveParentReference(row.payload, 'encounterId', db.encounters);
+    if (payload) ready.push({ row, payload });
+  }
+  if (ready.length === 0) return;
+
+  await table.bulkPut(ready.map(({ row }) => ({ ...row, status: 'syncing' as const })));
+
+  let data: Record<string, PushResult[]>;
+  try {
+    ({ data } = await apiClient.post('/sync/push', { [pushKey]: ready.map((r) => r.payload) }));
+  } catch (err) {
+    await table.bulkPut(ready.map(({ row }) => ({ ...row, status: 'pending' as const })));
+    throw err;
+  }
+
+  for (const result of data[pushKey]) {
+    if (result.status === 'ok') {
+      await table.delete(result.clientGeneratedId);
+    } else {
+      await table.update(result.clientGeneratedId, { status: 'error', error: result.error });
     }
   }
 }
@@ -109,16 +200,33 @@ async function pull() {
  * deduped on retry instead of duplicated.
  */
 async function reviveStuckRows(): Promise<void> {
-  const stuckPatients = await db.outboxPatients.where('status').equals('syncing').toArray();
-  if (stuckPatients.length) {
-    await db.outboxPatients.bulkPut(stuckPatients.map((p) => ({ ...p, status: 'pending' as const })));
+  const tables = [
+    db.outboxPatients,
+    db.outboxEncounters,
+    db.outboxVitals,
+    db.outboxDiagnoses,
+    db.outboxPrescriptions,
+    db.outboxLabOrders,
+  ];
+  for (const table of tables) {
+    const stuck = await table.where('status').equals('syncing').toArray();
+    if (stuck.length) {
+      await table.bulkPut(stuck.map((row) => ({ ...row, status: 'pending' as const })));
+    }
   }
-  const stuckEncounters = await db.outboxEncounters.where('status').equals('syncing').toArray();
-  if (stuckEncounters.length) {
-    await db.outboxEncounters.bulkPut(
-      stuckEncounters.map((e) => ({ ...e, status: 'pending' as const })),
-    );
-  }
+}
+
+async function flushAll(facilityId?: string): Promise<void> {
+  // Order matters: each step resolves parent references against rows the
+  // previous step may have just synced this same cycle (see the "promote"
+  // comments in flushPatients/flushEncounters) — patient before encounter,
+  // encounter before anything that hangs off it.
+  await flushPatients(facilityId);
+  await flushEncounters(facilityId);
+  await flushClinicalRecords(db.outboxVitals, 'vitals', facilityId);
+  await flushClinicalRecords(db.outboxDiagnoses, 'diagnoses', facilityId);
+  await flushClinicalRecords(db.outboxPrescriptions, 'prescriptions', facilityId);
+  await flushClinicalRecords(db.outboxLabOrders, 'labOrders', facilityId);
 }
 
 export async function runSync(): Promise<void> {
@@ -127,8 +235,7 @@ export async function runSync(): Promise<void> {
   notify();
   try {
     await reviveStuckRows();
-    await flushPatients();
-    await flushEncounters();
+    await flushAll();
     await pull();
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -150,8 +257,7 @@ export async function runSync(): Promise<void> {
  */
 export async function flushOutboxForFacility(facilityId: string): Promise<void> {
   try {
-    await flushPatients(facilityId);
-    await flushEncounters(facilityId);
+    await flushAll(facilityId);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Pre-login-wipe sync flush failed', err);
