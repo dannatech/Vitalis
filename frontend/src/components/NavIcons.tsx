@@ -109,3 +109,12 @@ export function ReferenceIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function BellIcon({ className }: IconProps) {
+  return (
+    <svg {...common} className={className}>
+      <path d="M10 3.2c-2.3 0-4.1 1.9-4.1 4.2v2.6c0 .5-.2 1-.5 1.4l-.9 1c-.6.7-.1 1.8.8 1.8h9.4c.9 0 1.4-1.1.8-1.8l-.9-1a2 2 0 0 1-.5-1.4V7.4c0-2.3-1.8-4.2-4.1-4.2Z" {...stroke} />
+      <path d="M8.3 16.2a1.8 1.8 0 0 0 3.4 0" {...stroke} />
+    </svg>
+  );
+}

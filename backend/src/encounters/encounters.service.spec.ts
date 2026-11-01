@@ -4,6 +4,7 @@ import { Role } from '@prisma/client';
 import { EncountersService } from './encounters.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncounterSummaryService } from '../sms/encounter-summary.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 const ACTOR: AuthenticatedUser = {
@@ -33,6 +34,7 @@ describe('EncountersService', () => {
     $transaction: jest.Mock;
   };
   let encounterSummary: { notifyEncounterClosed: jest.Mock };
+  let notifications: { notifyUser: jest.Mock; notifyRole: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -54,12 +56,17 @@ describe('EncountersService', () => {
       typeof arg === 'function' ? arg(prisma) : Promise.all(arg as Promise<unknown>[]),
     );
     encounterSummary = { notifyEncounterClosed: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      notifyUser: jest.fn().mockResolvedValue(undefined),
+      notifyRole: jest.fn().mockResolvedValue(undefined),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         EncountersService,
         { provide: PrismaService, useValue: prisma },
         { provide: EncounterSummaryService, useValue: encounterSummary },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -116,6 +123,13 @@ describe('EncountersService', () => {
           facilityId: 'facility-1',
         },
       });
+      expect(notifications.notifyRole).toHaveBeenCalledWith(
+        'facility-1',
+        [Role.RECORDS_OFFICER, Role.ADMIN, Role.SUPER_ADMIN],
+        'NOTIFIABLE_DISEASE_FLAGGED',
+        'Notifiable disease flagged: Cholera',
+        '/ncdc-reports',
+      );
     });
 
     it('does not open a report for an ordinary, non-notifiable diagnosis', async () => {
@@ -132,6 +146,7 @@ describe('EncountersService', () => {
       await service.addDiagnosis('encounter-1', { icd10Code: 'J00', description: 'Common cold' }, ACTOR);
 
       expect(prisma.notifiableDiseaseReport.create).not.toHaveBeenCalled();
+      expect(notifications.notifyRole).not.toHaveBeenCalled();
     });
 
     it('rejects a diagnosis on an encounter outside the actor\'s facility', async () => {
@@ -202,9 +217,16 @@ describe('EncountersService', () => {
         where: { id: 'encounter-1' },
         data: { updatedAt: expect.any(Date) },
       });
+      expect(notifications.notifyRole).toHaveBeenCalledWith(
+        'facility-1',
+        Role.PHARMACIST,
+        'PRESCRIPTION_NEW',
+        'New prescription: Amoxicillin',
+        '/pharmacy',
+      );
     });
 
-    it('dedupes a retried push by clientGeneratedId', async () => {
+    it('dedupes a retried push by clientGeneratedId without re-notifying', async () => {
       prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
       prisma.prescription.findUnique.mockResolvedValue({ id: 'rx-1', clientGeneratedId: 'cp-1' });
 
@@ -216,6 +238,7 @@ describe('EncountersService', () => {
 
       expect(result).toEqual({ id: 'rx-1', clientGeneratedId: 'cp-1' });
       expect(prisma.prescription.create).not.toHaveBeenCalled();
+      expect(notifications.notifyRole).not.toHaveBeenCalled();
     });
   });
 
@@ -230,9 +253,16 @@ describe('EncountersService', () => {
         where: { id: 'encounter-1' },
         data: { updatedAt: expect.any(Date) },
       });
+      expect(notifications.notifyRole).toHaveBeenCalledWith(
+        'facility-1',
+        Role.LAB_TECH,
+        'LAB_ORDER_NEW',
+        'New lab order: FBC',
+        '/labs',
+      );
     });
 
-    it('dedupes a retried push by clientGeneratedId', async () => {
+    it('dedupes a retried push by clientGeneratedId without re-notifying', async () => {
       prisma.encounter.findFirst.mockResolvedValue(ENCOUNTER);
       prisma.labOrder.findUnique.mockResolvedValue({ id: 'lo-1', clientGeneratedId: 'cl-1' });
 
@@ -244,12 +274,18 @@ describe('EncountersService', () => {
 
       expect(result).toEqual({ id: 'lo-1', clientGeneratedId: 'cl-1' });
       expect(prisma.labOrder.create).not.toHaveBeenCalled();
+      expect(notifications.notifyRole).not.toHaveBeenCalled();
     });
   });
 
   describe('addLabResult', () => {
     it('records the result and marks the order RESULTED in the same transaction', async () => {
-      prisma.labOrder.findFirst.mockResolvedValue({ id: 'order-1', encounterId: 'encounter-1' });
+      prisma.labOrder.findFirst.mockResolvedValue({
+        id: 'order-1',
+        encounterId: 'encounter-1',
+        testName: 'FBC',
+        orderedById: 'doctor-2',
+      });
       prisma.labResult.create.mockResolvedValue({ id: 'result-1', resultValue: '14.2' });
       prisma.labOrder.update.mockResolvedValue({ id: 'order-1', status: 'RESULTED' });
 
@@ -264,6 +300,13 @@ describe('EncountersService', () => {
         where: { id: 'encounter-1' },
         data: { updatedAt: expect.any(Date) },
       });
+      expect(notifications.notifyUser).toHaveBeenCalledWith(
+        'facility-1',
+        'doctor-2',
+        'LAB_RESULT_READY',
+        'Lab result ready: FBC',
+        '/encounters/encounter-1',
+      );
     });
 
     it('throws when the lab order is not in the actor\'s facility', async () => {

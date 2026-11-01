@@ -99,6 +99,11 @@ App runs on `http://localhost:5173`.
 - Append-only audit logging of all access to patient data
 - NCDC notifiable-disease flagging for reportable diagnoses
 - Facility-wide pharmacy dispensing worklist (`/pharmacy`)
+- In-app staff notifications (bell icon, polled every 30s): the ordering
+  clinician is notified when a lab result comes in, lab techs are notified
+  of a new order, pharmacists of a new prescription, and records
+  officers/admins when a diagnosis auto-flags as notifiable — each links
+  straight to the relevant worklist/encounter and clears on click
 - Billing & NHIS/HMO claims (`/billing`): patient invoicing with a facility
   price list, payments, patient insurance coverage, and a claims workflow
   (bundle finalized invoices per payer/period → submit → adjudicate →

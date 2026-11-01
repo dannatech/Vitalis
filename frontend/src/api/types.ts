@@ -296,3 +296,20 @@ export interface ClaimInvoiceEntry {
 export interface ClaimDetail extends ClaimListEntry {
   invoices: ClaimInvoiceEntry[];
 }
+
+/** ---- Notifications ---- */
+
+export type NotificationType =
+  | 'LAB_RESULT_READY'
+  | 'LAB_ORDER_NEW'
+  | 'PRESCRIPTION_NEW'
+  | 'NOTIFIABLE_DISEASE_FLAGGED';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  message: string;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+}

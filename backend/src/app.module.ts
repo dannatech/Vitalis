@@ -14,6 +14,7 @@ import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { ConsentModule } from './consent/consent.module';
 import { BillingModule } from './billing/billing.module';
 import { SyncModule } from './sync/sync.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { HealthController } from './health/health.controller';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
@@ -33,6 +34,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     ConsentModule,
     BillingModule,
     SyncModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [

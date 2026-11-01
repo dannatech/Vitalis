@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import NetworkStatusBadge from './NetworkStatusBadge';
+import NotificationBell from './NotificationBell';
 import Logo from './Logo';
 import {
   BillingIcon,
@@ -163,6 +164,7 @@ export default function Layout() {
             </button>
             <div className="header-right">
               <NetworkStatusBadge />
+              {!isDemo && <NotificationBell />}
               <span className="user-chip">
                 {user?.fullName} · {user?.role}
               </span>

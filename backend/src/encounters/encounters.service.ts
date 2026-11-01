@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EncounterStatus } from '@prisma/client';
+import { EncounterStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { CreateEncounterDto } from './dto/create-encounter.dto';
@@ -9,12 +9,14 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { CreateLabResultDto } from './dto/create-lab-result.dto';
 import { EncounterSummaryService } from '../sms/encounter-summary.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class EncountersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encounterSummary: EncounterSummaryService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async create(dto: CreateEncounterDto, actor: AuthenticatedUser) {
@@ -109,8 +111,8 @@ export class EncountersService {
       where: { icd10Code: dto.icd10Code },
     });
 
-    return this.prisma.$transaction(async (tx) => {
-      const diagnosis = await tx.diagnosis.create({
+    const diagnosis = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.diagnosis.create({
         data: {
           encounterId,
           icd10Code: dto.icd10Code,
@@ -129,15 +131,29 @@ export class EncountersService {
       if (notifiableDisease) {
         await tx.notifiableDiseaseReport.create({
           data: {
-            diagnosisId: diagnosis.id,
+            diagnosisId: created.id,
             patientId: encounter.patientId,
             facilityId: encounter.facilityId,
           },
         });
       }
 
-      return diagnosis;
+      return created;
     });
+
+    if (notifiableDisease) {
+      // Fire-and-forget — see NotificationsService for why this can never
+      // fail the diagnosis write itself.
+      void this.notifications.notifyRole(
+        actor.facilityId,
+        [Role.RECORDS_OFFICER, Role.ADMIN, Role.SUPER_ADMIN],
+        'NOTIFIABLE_DISEASE_FLAGGED',
+        `Notifiable disease flagged: ${notifiableDisease.name}`,
+        '/ncdc-reports',
+      );
+    }
+
+    return diagnosis;
   }
 
   async addPrescription(
@@ -156,6 +172,15 @@ export class EncountersService {
       this.prisma.prescription.create({ data: { encounterId, ...dto, prescribedById: actor.id } }),
       this.prisma.encounter.update({ where: { id: encounterId }, data: { updatedAt: new Date() } }),
     ]);
+
+    void this.notifications.notifyRole(
+      actor.facilityId,
+      Role.PHARMACIST,
+      'PRESCRIPTION_NEW',
+      `New prescription: ${dto.medicationName}`,
+      '/pharmacy',
+    );
+
     return prescription;
   }
 
@@ -178,6 +203,15 @@ export class EncountersService {
       }),
       this.prisma.encounter.update({ where: { id: encounterId }, data: { updatedAt: new Date() } }),
     ]);
+
+    void this.notifications.notifyRole(
+      actor.facilityId,
+      Role.LAB_TECH,
+      'LAB_ORDER_NEW',
+      `New lab order: ${dto.testName}`,
+      '/labs',
+    );
+
     return labOrder;
   }
 
@@ -203,6 +237,15 @@ export class EncountersService {
         data: { updatedAt: new Date() },
       }),
     ]);
+
+    void this.notifications.notifyUser(
+      actor.facilityId,
+      order.orderedById,
+      'LAB_RESULT_READY',
+      `Lab result ready: ${order.testName}`,
+      `/encounters/${order.encounterId}`,
+    );
+
     return result;
   }
 

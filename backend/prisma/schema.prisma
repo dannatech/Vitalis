@@ -36,6 +36,7 @@ model Facility {
   tariffItems              TariffItem[]
   invoices                 Invoice[]
   claims                   Claim[]
+  notifications            Notification[]
 
   @@map("facilities")
 }
@@ -82,6 +83,7 @@ model User {
   invoicesCreated       Invoice[]
   paymentsReceived      Payment[]
   claimsCreated         Claim[]
+  notifications         Notification[]
 
   @@map("users")
 }
@@ -658,4 +660,37 @@ model Claim {
 
   @@unique([facilityId, claimNumber])
   @@map("claims")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  LAB_RESULT_READY
+  LAB_ORDER_NEW
+  PRESCRIPTION_NEW
+  NOTIFIABLE_DISEASE_FLAGGED
+}
+
+/// In-app alerts for staff — e.g. a lab tech's result reaching the ordering
+/// doctor, a new order reaching the worklist role that has to act on it.
+/// One row per recipient (not a single broadcast row with a join table) —
+/// facility staff counts are small enough that this keeps "my unread
+/// notifications" a trivial indexed query instead of a join.
+model Notification {
+  id         String           @id @default(uuid())
+  facilityId String
+  facility   Facility         @relation(fields: [facilityId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  type       NotificationType
+  message    String
+  /// Relative frontend path to open when clicked, e.g. "/encounters/<id>"
+  link       String?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
 }
