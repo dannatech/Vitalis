@@ -74,4 +74,10 @@ export class InvoicesController {
   ) {
     return this.invoicesService.recordPayment(id, dto, user);
   }
+
+  @Post(':id/virtual-account')
+  @Audit('VIRTUAL_ACCOUNT_GENERATE', 'Invoice')
+  generateVirtualAccount(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.invoicesService.generateVirtualAccount(id, user);
+  }
 }

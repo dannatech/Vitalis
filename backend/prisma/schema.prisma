@@ -589,6 +589,15 @@ model Invoice {
   createdAt   DateTime @default(now())
   finalizedAt DateTime?
 
+  /// Dedicated/virtual bank account minted for this invoice so a bank
+  /// transfer can be auto-reconciled by account number instead of trusting
+  /// a patient-presented screenshot or SMS alert — see PaystackService.
+  virtualAccountNumber   String?
+  virtualAccountBankName String?
+  /// The payment provider's own id for this account (Paystack's
+  /// dedicated_account id), kept for debugging/support, not matching.
+  virtualAccountRef      String?
+
   chargeLines ChargeLine[]
   payments    Payment[]
 
@@ -596,6 +605,7 @@ model Invoice {
   claim   Claim?  @relation(fields: [claimId], references: [id])
 
   @@unique([facilityId, invoiceNumber])
+  @@unique([virtualAccountNumber])
   @@index([facilityId, status])
   @@map("invoices")
 }
@@ -616,8 +626,11 @@ model Payment {
   method     PaymentMethod
   reference  String?
 
-  receivedById String
-  receivedBy   User     @relation(fields: [receivedById], references: [id])
+  /// Null for a payment auto-reconciled from a bank-transfer webhook — see
+  /// PaystackWebhookController. No staff member "received" it; the system
+  /// confirmed the deposit itself.
+  receivedById String?
+  receivedBy   User?    @relation(fields: [receivedById], references: [id])
   receivedAt   DateTime @default(now())
 
   @@map("payments")
@@ -671,6 +684,7 @@ enum NotificationType {
   LAB_ORDER_NEW
   PRESCRIPTION_NEW
   NOTIFIABLE_DISEASE_FLAGGED
+  PAYMENT_RECEIVED
 }
 
 /// In-app alerts for staff — e.g. a lab tech's result reaching the ordering

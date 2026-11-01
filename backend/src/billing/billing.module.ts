@@ -9,16 +9,28 @@ import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
 import { ClaimsService } from './claims.service';
 import { ClaimsController } from './claims.controller';
+import { PaystackService } from './paystack.service';
+import { PaystackWebhookController } from './paystack-webhook.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [
     PayersController,
     TariffsController,
     CoverageController,
     InvoicesController,
     ClaimsController,
+    PaystackWebhookController,
   ],
-  providers: [PayersService, TariffsService, CoverageService, InvoicesService, ClaimsService],
+  providers: [
+    PayersService,
+    TariffsService,
+    CoverageService,
+    InvoicesService,
+    ClaimsService,
+    PaystackService,
+  ],
   exports: [PayersService],
 })
 export class BillingModule {}

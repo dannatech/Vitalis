@@ -7,7 +7,10 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true preserves the exact request bytes on req.rawBody alongside
+  // the normal parsed body — PaystackWebhookController needs the untouched
+  // bytes to verify the HMAC signature Paystack sends with each webhook.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.use(helmet());
   app.setGlobalPrefix('api');

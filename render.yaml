@@ -50,3 +50,15 @@ services:
       # Must be a sender ID registered/approved in your Termii dashboard.
       - key: TERMII_SENDER_ID
         sync: false
+      # Paystack (https://paystack.com) secret key — mints a dedicated virtual
+      # bank account per finalized invoice so a bank transfer is confirmed by
+      # webhook instead of a cashier trusting a patient's screenshot. Leave
+      # unset to disable; "Generate payment account" then returns a clear
+      # error instead of silently failing. Requires Paystack business KYC
+      # approval for Dedicated Virtual Accounts.
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      # Must be a bank your Paystack account is approved to issue dedicated
+      # accounts on.
+      - key: PAYSTACK_PREFERRED_BANK
+        value: wema-bank

@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Invoice, InvoiceStatus } from '@prisma/client';
+import { Invoice, InvoiceStatus, PaymentMethod } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PayersService } from './payers.service';
+import { PaystackService } from './paystack.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { AddChargeLineDto } from './dto/add-charge-line.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
@@ -13,6 +14,7 @@ export class InvoicesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly payersService: PayersService,
+    private readonly paystack: PaystackService,
   ) {}
 
   async create(dto: CreateInvoiceDto, actor: AuthenticatedUser): Promise<Invoice> {
@@ -164,6 +166,94 @@ export class InvoicesService {
       where: { id: invoiceId, facilityId: actor.facilityId },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
+
+    const { payment } = await this.applyPayment(invoice, {
+      amount: dto.amount,
+      method: dto.method,
+      reference: dto.reference,
+      receivedById: actor.id,
+    });
+    return payment;
+  }
+
+  /**
+   * Generates (or returns the already-generated) dedicated virtual account
+   * for this invoice so the patient can pay by bank transfer — see
+   * PaystackService. One account per invoice: once minted it's reused
+   * rather than replaced, so an already-printed slip stays valid.
+   */
+  async generateVirtualAccount(invoiceId: string, actor: AuthenticatedUser) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, facilityId: actor.facilityId },
+      include: { patient: { select: { firstName: true, surname: true } } },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === InvoiceStatus.DRAFT) {
+      throw new BadRequestException('Finalize the invoice before generating a payment account');
+    }
+    if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.VOID) {
+      throw new BadRequestException('This invoice has no outstanding balance to collect');
+    }
+    if (invoice.virtualAccountNumber) {
+      return invoice;
+    }
+    if (!this.paystack.isConfigured()) {
+      throw new BadRequestException(
+        'Bank transfer reconciliation is not configured for this facility (PAYSTACK_SECRET_KEY missing)',
+      );
+    }
+
+    const account = await this.paystack.createVirtualAccountForInvoice({
+      invoiceId: invoice.id,
+      patientFirstName: invoice.patient.firstName,
+      patientLastName: invoice.patient.surname,
+    });
+
+    return this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        virtualAccountNumber: account.accountNumber,
+        virtualAccountBankName: account.bankName,
+        virtualAccountRef: account.providerRef,
+      },
+    });
+  }
+
+  /**
+   * Called by PaystackWebhookController once a deposit into an invoice's
+   * virtual account is confirmed — no actor, since nothing a human did
+   * "received" it, the provider's own webhook is the confirmation. Returns
+   * null if the account number doesn't match any invoice at this facility
+   * (shouldn't happen for a genuine Paystack event, but a malformed/replayed
+   * one shouldn't throw and retry-loop on the provider's side).
+   */
+  async recordAutomatedPayment(
+    virtualAccountNumber: string,
+    data: { amount: number; reference: string },
+  ) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { virtualAccountNumber },
+      include: { facility: { select: { country: true } } },
+    });
+    if (!invoice) return null;
+    if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.VOID) {
+      // Already settled (or voided after the transfer was sent) — nothing
+      // to apply. Avoids double-crediting a retried webhook delivery.
+      return null;
+    }
+
+    const result = await this.applyPayment(invoice, {
+      amount: data.amount,
+      method: PaymentMethod.BANK_TRANSFER,
+      reference: data.reference,
+    });
+    return { ...result, facilityCountry: invoice.facility.country };
+  }
+
+  private async applyPayment(
+    invoice: Invoice,
+    data: { amount: number; method: PaymentMethod; reference?: string; receivedById?: string },
+  ) {
     if (invoice.status === InvoiceStatus.DRAFT) {
       throw new BadRequestException('Finalize the invoice before recording a payment');
     }
@@ -171,26 +261,26 @@ export class InvoicesService {
       throw new BadRequestException('Cannot record a payment against a void invoice');
     }
 
-    const newAmountPaid = invoice.amountPaid + dto.amount;
+    const newAmountPaid = invoice.amountPaid + data.amount;
     const newStatus =
       newAmountPaid >= invoice.subtotal ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID;
 
-    const [payment] = await this.prisma.$transaction([
+    const [payment, updatedInvoice] = await this.prisma.$transaction([
       this.prisma.payment.create({
         data: {
-          invoiceId,
-          amount: dto.amount,
-          method: dto.method,
-          reference: dto.reference,
-          receivedById: actor.id,
+          invoiceId: invoice.id,
+          amount: data.amount,
+          method: data.method,
+          reference: data.reference,
+          receivedById: data.receivedById,
         },
       }),
       this.prisma.invoice.update({
-        where: { id: invoiceId },
+        where: { id: invoice.id },
         data: { amountPaid: newAmountPaid, status: newStatus },
       }),
     ]);
 
-    return payment;
+    return { payment, invoice: updatedInvoice };
   }
 }
