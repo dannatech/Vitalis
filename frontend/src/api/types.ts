@@ -269,6 +269,9 @@ export interface InvoiceListEntry {
 export interface InvoiceDetail extends InvoiceListEntry {
   chargeLines: ChargeLine[];
   payments: InvoicePayment[];
+  /** Set once "Generate payment account" has minted a dedicated virtual account for this invoice. */
+  virtualAccountNumber: string | null;
+  virtualAccountBankName: string | null;
 }
 
 /** One row of GET /billing/claims (and the shape returned by generate/submit/adjudicate/mark-paid). */
@@ -303,7 +306,8 @@ export type NotificationType =
   | 'LAB_RESULT_READY'
   | 'LAB_ORDER_NEW'
   | 'PRESCRIPTION_NEW'
-  | 'NOTIFIABLE_DISEASE_FLAGGED';
+  | 'NOTIFIABLE_DISEASE_FLAGGED'
+  | 'PAYMENT_RECEIVED';
 
 export interface AppNotification {
   id: string;

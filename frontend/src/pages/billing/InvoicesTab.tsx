@@ -26,6 +26,21 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
 
 const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'CAPITATION', 'OTHER'];
 
+/**
+ * The backend's global filter wraps every error body as
+ * `{ statusCode, timestamp, message }`, where `message` is Nest's own
+ * `exception.getResponse()` — for a plain `new BadRequestException('text')`
+ * that's itself `{ statusCode, error, message: 'text' }`, not a string.
+ */
+function extractErrorMessage(data: unknown): string | undefined {
+  const raw = (data as { message?: unknown } | undefined)?.message;
+  if (typeof raw === 'string') return raw;
+  if (raw && typeof raw === 'object' && typeof (raw as { message?: unknown }).message === 'string') {
+    return (raw as { message: string }).message;
+  }
+  return undefined;
+}
+
 function statusBadgeClass(status: InvoiceStatus): string {
   if (status === 'PAID') return 'badge success';
   if (status === 'VOID') return 'badge danger';
@@ -69,6 +84,10 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [paymentReference, setPaymentReference] = useState('');
 
+  const [generatingAccount, setGeneratingAccount] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const loadInvoices = useCallback(async () => {
     try {
       const { data } = await apiClient.get<InvoiceListEntry[]>('/billing/invoices', {
@@ -98,6 +117,15 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId);
   }, [selectedId, loadDetail]);
+
+  // While a virtual account is waiting on a bank transfer, poll so the
+  // cashier's screen flips to Paid the moment the webhook reconciles it —
+  // no need to refresh or re-check manually.
+  useEffect(() => {
+    if (!selectedId || !detail?.virtualAccountNumber || detail.status === 'PAID') return;
+    const interval = setInterval(() => void loadDetail(selectedId), 10_000);
+    return () => clearInterval(interval);
+  }, [selectedId, detail?.virtualAccountNumber, detail?.status, loadDetail]);
 
   async function searchPatients() {
     if (!patientSearch.trim()) {
@@ -196,6 +224,36 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
       );
     } finally {
       setWorking(false);
+    }
+  }
+
+  async function handleGenerateAccount() {
+    if (!detail) return;
+    setAccountError(null);
+    setGeneratingAccount(true);
+    try {
+      await apiClient.post(`/billing/invoices/${detail.id}/virtual-account`);
+      await loadDetail(detail.id);
+    } catch (err) {
+      setAccountError(
+        axios.isAxiosError(err) && err.response?.status === 400
+          ? extractErrorMessage(err.response.data) ??
+              'Bank transfer reconciliation is not available for this facility.'
+          : 'Could not generate a payment account — try again.',
+      );
+    } finally {
+      setGeneratingAccount(false);
+    }
+  }
+
+  async function handleCopyAccountNumber(accountNumber: string) {
+    try {
+      await navigator.clipboard.writeText(accountNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be denied (e.g. non-HTTPS, permissions) — the
+      // account number is still shown on screen for the cashier to read out.
     }
   }
 
@@ -354,6 +412,51 @@ export default function InvoicesTab({ payers, tariffItems }: Props) {
               Finalize invoice
             </button>
           </div>
+        )}
+
+        {detail.status !== 'DRAFT' && detail.status !== 'VOID' && detail.status !== 'PAID' && (
+          <section className="card" style={{ maxWidth: 'none' }}>
+            <h3>Bank transfer payment account</h3>
+            {accountError && <div className="error-banner">{accountError}</div>}
+            {detail.virtualAccountNumber ? (
+              <div>
+                <p className="muted-inline">
+                  Have the patient transfer the balance to this account. The invoice will flip to
+                  Paid automatically once the transfer is confirmed — no screenshot or SMS alert
+                  needed.
+                </p>
+                <dl className="detail-grid">
+                  <dt>Bank</dt>
+                  <dd>{detail.virtualAccountBankName}</dd>
+                  <dt>Account number</dt>
+                  <dd>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 600, letterSpacing: '0.05em' }}>
+                      {detail.virtualAccountNumber}
+                    </span>{' '}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => handleCopyAccountNumber(detail.virtualAccountNumber!)}
+                    >
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </dd>
+                </dl>
+              </div>
+            ) : (
+              <div>
+                <p className="muted-inline">
+                  Generate a dedicated account number for this invoice instead of accepting a bank
+                  transfer on trust.
+                </p>
+                <div className="actions">
+                  <button type="button" onClick={handleGenerateAccount} disabled={generatingAccount}>
+                    {generatingAccount ? 'Generating…' : 'Generate payment account'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
         )}
 
         {detail.status !== 'DRAFT' && detail.status !== 'VOID' && (
